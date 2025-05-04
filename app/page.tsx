@@ -27,6 +27,10 @@ export default function Home() {
   const [allImageUrls, setAllImageUrls] = useState<string[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const themeSelectorRef = useRef<HTMLDivElement>(null);
+  const mouseVelocityRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
+  const lastMousePositionRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
+  const [mouseParallaxEnabled, setMouseParallaxEnabled] = useState(true);
+  const targetCameraPositionRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 7));
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -167,6 +171,12 @@ export default function Home() {
         const scale = 0.4 + Math.random() * 0.4;
         mesh.scale.set(scale, scale, scale);
         
+        // Store the original scale for hover effects
+        mesh.userData.originalScale = { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z };
+        
+        // Store image index for modal opening
+        mesh.userData.imageIndex = index;
+        
         // ---- IMPROVED PHYSICS - TARGET POSITIONING ----
         // Define boundaries with improved Z constraints
         const boundX = 8; // Reduced boundary to keep images more centered
@@ -253,14 +263,73 @@ export default function Home() {
       rendererRef.current.setPixelRatio(window.devicePixelRatio);
     };
     
-    // Handle mouse movement
+    // Handle mouse movement with velocity tracking
     const handleMouseMove = (event: MouseEvent) => {
+      // Update last mouse position
+      lastMousePositionRef.current.x = mouseRef.current.x;
+      lastMousePositionRef.current.y = mouseRef.current.y;
+      
       // Update mouse position in normalized device coordinates (-1 to +1)
-      mouseRef.current.x = -(event.clientX / window.innerWidth) * 2 - 1;
-      mouseRef.current.y = (event.clientY / window.innerHeight) * 2 + 1;
+      mouseRef.current.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouseRef.current.y = - (event.clientY / window.innerHeight) * 2 + 1;
+      
+      // Calculate velocity (for inertia effects)
+      mouseVelocityRef.current.x = mouseRef.current.x - lastMousePositionRef.current.x;
+      mouseVelocityRef.current.y = mouseRef.current.y - lastMousePositionRef.current.y;
+    };
+
+    // Handle mouse click on 3D objects
+    const handleMouseClick = (event: MouseEvent) => {
+      if (!isMouseInteractionEnabled || !sceneRef.current || !cameraRef.current || !raycasterRef.current) return;
+      
+      // Check for intersections with 3D images
+      raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
+      const intersects = raycasterRef.current.intersectObjects(imagesRef.current);
+      
+      if (intersects.length > 0) {
+        const clickedMesh = intersects[0].object as THREE.Mesh;
+        const imageIndex = clickedMesh.userData.imageIndex;
+        
+        // Play quick scale animation
+        const originalScale = clickedMesh.userData.originalScale;
+        
+        // Timeline of quick animation on click
+        const scaleUp = () => {
+          if (originalScale) {
+            clickedMesh.scale.set(
+              originalScale.x * 1.2,
+              originalScale.y * 1.2,
+              originalScale.z * 1.2
+            );
+          }
+          setTimeout(scaleDown, 100);
+        };
+        
+        const scaleDown = () => {
+          if (originalScale) {
+            clickedMesh.scale.set(
+              originalScale.x,
+              originalScale.y,
+              originalScale.z
+            );
+          }
+          setTimeout(() => {
+            // Open modal with this image - ensure it's within the valid range
+            // We need to make sure we're using the correct image source
+            if (imageIndex >= 0 && imageIndex < allImageUrls.length) {
+              setModalIndex(imageIndex);
+              setShowAllPhotos(true); // Set to true to use allImageUrls
+              setModalOpen(true);
+            }
+          }, 100);
+        };
+        
+        scaleUp();
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('click', handleMouseClick);
     window.addEventListener('resize', handleResize);
     
     // Handle mouse interaction
@@ -278,6 +347,18 @@ export default function Home() {
         const material = hoveredImage.material as THREE.MeshStandardMaterial;
         material.emissiveIntensity = material.userData?.originalEmissive || 0.2;
         material.roughness = material.userData?.originalRoughness || 0.15;
+        
+        // Reset scale if we're no longer hovering
+        if (intersects.length === 0 || intersects[0].object !== hoveredImage) {
+          const originalScale = hoveredImage.userData.originalScale;
+          if (originalScale) {
+            hoveredImage.scale.set(
+              originalScale.x,
+              originalScale.y,
+              originalScale.z
+            );
+          }
+        }
       }
 
       // Handle new hover state
@@ -295,6 +376,35 @@ export default function Home() {
         }
         material.emissiveIntensity = 0.5;
         material.roughness = 0.05;
+        
+        // Scale up the hovered image slightly
+        const originalScale = newHoveredImage.userData.originalScale;
+        if (originalScale) {
+          newHoveredImage.scale.set(
+            originalScale.x * 1.15,
+            originalScale.y * 1.15,
+            originalScale.z * 1.15
+          );
+        } else {
+          // If originalScale is not defined, store current scale and scale up
+          newHoveredImage.userData.originalScale = { 
+            x: newHoveredImage.scale.x,
+            y: newHoveredImage.scale.y,
+            z: newHoveredImage.scale.z
+          };
+          newHoveredImage.scale.set(
+            newHoveredImage.scale.x * 1.15,
+            newHoveredImage.scale.y * 1.15,
+            newHoveredImage.scale.z * 1.15
+          );
+        }
+        
+        // Rotate slightly toward camera for better visibility
+        newHoveredImage.rotation.x += (0 - newHoveredImage.rotation.x) * 0.03;
+        newHoveredImage.rotation.y += (0 - newHoveredImage.rotation.y) * 0.03;
+        
+        // Add outline effect or glow if desired
+        // (This would require additional post-processing which could be added later)
       } else {
         setHoveredImage(null);
       }
@@ -306,17 +416,50 @@ export default function Home() {
       
       // Update camera position based on mouse only if interaction is enabled
       if (cameraRef.current && isMouseInteractionEnabled) {
-        const targetX = mouseRef.current.x * 2;
-        const targetY = mouseRef.current.y * 2;
-        cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.05;
-        cameraRef.current.position.y += (targetY - cameraRef.current.position.y) * 0.05;
-        cameraRef.current.lookAt(0, 0, 0);
+        // Apply inertia effect for smoother camera movement
+        if (mouseParallaxEnabled) {
+          // Calculate target position with parallax
+          targetCameraPositionRef.current.x = mouseRef.current.x * 3;
+          targetCameraPositionRef.current.y = mouseRef.current.y * 2;
+          
+          // Apply velocity factor for momentum
+          const momentumFactor = 0.3;
+          targetCameraPositionRef.current.x += mouseVelocityRef.current.x * 20 * momentumFactor;
+          targetCameraPositionRef.current.y += mouseVelocityRef.current.y * 20 * momentumFactor;
+          
+          // Smooth transition to target with dynamic damping
+          const damping = 0.05 + (Math.abs(mouseVelocityRef.current.x) + Math.abs(mouseVelocityRef.current.y)) * 0.01;
+          cameraRef.current.position.x += (targetCameraPositionRef.current.x - cameraRef.current.position.x) * damping;
+          cameraRef.current.position.y += (targetCameraPositionRef.current.y - cameraRef.current.position.y) * damping;
+          
+          // Dynamic Z position based on mouse movement (slight zoom effect)
+          const baseZ = 7;
+          const zVariation = Math.abs(mouseRef.current.x * mouseRef.current.y) * 1.5;
+          targetCameraPositionRef.current.z = baseZ - zVariation;
+          cameraRef.current.position.z += (targetCameraPositionRef.current.z - cameraRef.current.position.z) * 0.03;
+          
+          // Apply subtle tilt effect based on mouse position
+          cameraRef.current.rotation.x = mouseRef.current.y * 0.1;
+          cameraRef.current.rotation.y = -mouseRef.current.x * 0.1;
+        } else {
+          // Original camera movement logic without parallax
+          const targetX = mouseRef.current.x * 2;
+          const targetY = mouseRef.current.y * 2;
+          cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.05;
+          cameraRef.current.position.y += (targetY - cameraRef.current.position.y) * 0.05;
+          cameraRef.current.lookAt(0, 0, 0);
+        }
+        
+        // Gradually decay mouse velocity
+        mouseVelocityRef.current.x *= 0.95;
+        mouseVelocityRef.current.y *= 0.95;
       } else if (cameraRef.current) {
         // Smoothly return to center when disabled
         cameraRef.current.position.x *= 0.95;
         cameraRef.current.position.y *= 0.95;
-        // Ensure camera straightens completely by approaching 0 directly
-       
+        cameraRef.current.rotation.x *= 0.95;
+        cameraRef.current.rotation.y *= 0.95;
+        cameraRef.current.position.z += (7 - cameraRef.current.position.z) * 0.05;
         cameraRef.current.lookAt(0, 0, 0);
       }
 
@@ -480,6 +623,7 @@ export default function Home() {
       
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('click', handleMouseClick);
       
       if (rendererRef.current && containerRef.current) {
         containerRef.current.removeChild(rendererRef.current.domElement);
@@ -521,11 +665,13 @@ export default function Home() {
   const closeModal = () => setModalOpen(false);
   const showPrevImage = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setModalIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+    const currentArray = showAllPhotos ? allImageUrls : imageUrls;
+    setModalIndex((prev) => (prev - 1 + currentArray.length) % currentArray.length);
   };
   const showNextImage = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setModalIndex((prev) => (prev + 1) % imageUrls.length);
+    const currentArray = showAllPhotos ? allImageUrls : imageUrls;
+    setModalIndex((prev) => (prev + 1) % currentArray.length);
   };
   const handleModalBackdropClick = () => closeModal();
   // Handle Esc key to close modal
@@ -666,6 +812,11 @@ export default function Home() {
 
   const themeColors = getThemeColors();
 
+  // Add new toggle for parallax effects
+  const toggleParallaxEffects = () => {
+    setMouseParallaxEnabled(!mouseParallaxEnabled);
+  };
+
   return (
     <div className={themeColors.bg}>
       <main className="relative min-h-screen overflow-hidden">
@@ -697,32 +848,31 @@ export default function Home() {
               </div>
             </div>
             
-            <nav className="flex space-x-6 items-center">
-              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
-                Manifesto
-              </Link>
-              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
-                Careers
-              </Link>
-              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
-                Discover
-              </Link>
-              <Link href="#" className={`text-sm px-4 py-2 rounded-full border ${themeColors.buttonOutline}`}>
-                Log In
-              </Link>
-              <Link href="#" className={`text-sm px-4 py-2 rounded-full ${themeColors.button}`}>
-                Sign up
-              </Link>
-            </nav>
+            <div className="flex space-x-2">
+              
+              
+              <nav className="flex space-x-6 items-center">
+                <Link href="https://github.com/tanvishdesai" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
+                  GitHub
+                </Link>
+                <Link href="https://www.instagram.com/tanvish.desai/" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
+                  Instagram
+                </Link>
+                <Link href="https://zuckonit.vercel.app" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
+                  ZuckOnit
+                </Link>
+         
+              </nav>
+            </div>
           </header>
           
           {/* Main hero content */}
           <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
             <h1 className={`text-8xl font-bold mb-4 ${themeColors.text}`}>
-              COSMOS<sup className="text-xl align-super">©</sup>
+              BERNET<sup className="text-xl align-super">©</sup>
             </h1>
             <p className={`text-xl ${themeColors.textMuted}`}>
-              A discovery engine for <span className={`px-3 py-1 rounded-full ${themeColors.card}`}>photographers</span>
+              Whatever you can imagine it to be 
             </p>
           </div>
           
@@ -788,18 +938,25 @@ export default function Home() {
             <h2 className={`text-5xl font-bold mb-4 ${themeColors.text}`}>
               <span className="relative inline-block">
                 <span className="relative z-10">Gallery</span>
-                <span className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-pink-500"></span>
+                <span className={`absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r ${
+                  currentTheme === 'dark' ? 'from-gray-400 to-gray-600' :
+                  currentTheme === 'light' ? 'from-gray-300 to-gray-500' :
+                  currentTheme === 'blue' ? 'from-blue-400 to-blue-600' :
+                  currentTheme === 'red' ? 'from-red-400 to-red-600' :
+                  currentTheme === 'purple' ? 'from-purple-400 to-pink-500' :
+                  'from-emerald-400 to-emerald-600'
+                }`}></span>
               </span>
             </h2>
             <p className={`text-lg max-w-2xl mx-auto ${themeColors.textMuted}`}>
-              Explore our curated collection of stunning photographs captured with precision and artistry
+              People i saw without them seeing me
             </p>
           </div>
           
           {/* Masonry layout for gallery preview (when not showing all) */}
           {!showAllPhotos && (
             <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6">
-              {imageUrls.map((url, idx) => (
+              {imageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
                 <div
                   key={url + idx}
                   className="break-inside-avoid-column group"
@@ -856,7 +1013,7 @@ export default function Home() {
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {allImageUrls.map((url, idx) => (
+                {allImageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
                   <div
                     key={url + idx}
                     className="group"
@@ -928,14 +1085,29 @@ export default function Home() {
               </button>
               
               <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-black/50 to-black p-1">
-                <Image
-                  src={showAllPhotos ? allImageUrls[modalIndex] : imageUrls[modalIndex]}
-                  alt={`Full image ${modalIndex + 1}`}
-                  width={1200}
-                  height={900}
-                  className="max-h-[75vh] object-contain rounded-lg"
-                  priority
-                />
+                {(() => {
+                  // Use the appropriate image array based on source
+                  const currentImageArray = showAllPhotos ? allImageUrls : imageUrls;
+                  
+                  // Ensure modalIndex is within bounds
+                  const safeModalIndex = Math.min(Math.max(0, modalIndex), currentImageArray.length - 1);
+                  const imageSrc = currentImageArray[safeModalIndex] || '';
+                  
+                  return imageSrc && imageSrc.trim() !== '' ? (
+                    <Image
+                      src={imageSrc}
+                      alt={`Full image ${safeModalIndex + 1}`}
+                      width={1200}
+                      height={900}
+                      className="max-h-[75vh] object-contain rounded-lg"
+                      priority
+                    />
+                  ) : (
+                    <div className="w-[1200px] h-[900px] max-h-[75vh] flex items-center justify-center text-gray-400">
+                      Image not available
+                    </div>
+                  );
+                })()}
               </div>
               
               <div className="flex items-center justify-between w-full mt-4 px-4">
@@ -949,7 +1121,7 @@ export default function Home() {
                 </button>
                 
                 <div className={`${themeColors.textMuted} text-sm`}>
-                  {modalIndex + 1} / {showAllPhotos ? allImageUrls.length : imageUrls.length}
+                  {modalIndex + 1} / {(showAllPhotos ? allImageUrls : imageUrls).length}
                 </div>
                 
                 <button
