@@ -21,6 +21,10 @@ export default function Home() {
   const totalImages = 70;
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalIndex, setModalIndex] = useState(0);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [allImageUrls, setAllImageUrls] = useState<string[]>([]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -83,12 +87,18 @@ export default function Home() {
     spotlight.distance = 200;
     scene.add(spotlight);
 
-    // Load images
+    // Load images for 3D view (subset)
     const imageFiles = Array.from({ length: 35 }, (_, i) => 
       `/images/DSCF${3726 + i}.JPG`
     );
     
-    setImageUrls(imageFiles); // Store image URLs for the grid display
+    setImageUrls(imageFiles.slice(0, 12)); // Show only first 12 images in preview
+    
+    // Load all images for the full gallery view
+    const allFiles = Array.from({ length: 35 }, (_, i) => 
+      `/images/DSCF${3726 + i}.JPG`
+    );
+    setAllImageUrls(allFiles);
 
     const textureLoader = new THREE.TextureLoader();
     textureLoader.crossOrigin = "anonymous";
@@ -494,6 +504,40 @@ export default function Home() {
   const loadingProgress = Math.round((imagesLoaded / totalImages) * 100);
   const isLoading = imagesLoaded < totalImages;
 
+  const closeModal = () => setModalOpen(false);
+  const showPrevImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setModalIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+  };
+  const showNextImage = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setModalIndex((prev) => (prev + 1) % imageUrls.length);
+  };
+  const handleModalBackdropClick = () => closeModal();
+  // Handle Esc key to close modal
+  useEffect(() => {
+    if (!modalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeModal();
+      if (e.key === 'ArrowLeft') showPrevImage();
+      if (e.key === 'ArrowRight') showNextImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalOpen, imageUrls.length]);
+
+  // Toggle full gallery view
+  const toggleAllPhotos = () => {
+    setShowAllPhotos(!showAllPhotos);
+    // Scroll to gallery section when opening
+    if (!showAllPhotos) {
+      const gallerySection = document.getElementById('gallery-section');
+      if (gallerySection) {
+        gallerySection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  };
+
   return (
     <div className={`${isDarkMode ? 'bg-black' : 'bg-white'}`}>
       <main className="relative min-h-screen overflow-hidden">
@@ -573,51 +617,197 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Image Grid Section */}
-      <section className={`py-20 px-4 ${isDarkMode ? 'bg-black' : 'bg-white'}`}>
+      {/* Interactive Image Gallery Section */}
+      <section id="gallery-section" className="relative z-20 py-24 px-4 bg-gradient-to-b from-black/90 via-black/70 to-transparent">
         <div className="max-w-7xl mx-auto">
-          <h2 className={`text-4xl font-bold mb-12 ${isDarkMode ? 'text-white' : 'text-black'}`}>
-            Explore the Collection
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {imageUrls.map((url, index) => (
-              <div 
-                key={url}
-                className={`group relative aspect-[3/4] overflow-hidden rounded-lg 
-                  transform transition-all duration-500 ease-out hover:scale-[1.02]
-                  ${isDarkMode ? 'bg-white/5' : 'bg-black/5'}`}
-                style={{
-                  perspective: '1000px',
-                  transformStyle: 'preserve-3d',
-                }}
-              >
-                <div
-                  className="absolute inset-0 transition-transform duration-500 ease-out group-hover:rotate-y-6"
-                  style={{ transformStyle: 'preserve-3d' }}
-                >
-                  <Image
-                    src={url}
-                    alt={`Gallery image ${index + 1}`}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  />
-                </div>
-                <div 
-                  className={`absolute inset-0 opacity-0 group-hover:opacity-100 
-                    transition-opacity duration-300 flex items-end p-6
-                    bg-gradient-to-t ${isDarkMode ? 'from-black/70' : 'from-white/70'} to-transparent`}
-                >
-                  <div className={`text-sm ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                    <p className="font-semibold">Photo {index + 1}</p>
-                    <p className="opacity-70">Click to view details</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="mb-16 text-center">
+            <h2 className={`text-5xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+              <span className="relative inline-block">
+                <span className="relative z-10">Gallery</span>
+                <span className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-pink-500"></span>
+              </span>
+            </h2>
+            <p className={`text-lg max-w-2xl mx-auto ${isDarkMode ? 'text-white/70' : 'text-black/70'}`}>
+              Explore our curated collection of stunning photographs captured with precision and artistry
+            </p>
           </div>
+          
+          {/* Masonry layout for gallery preview (when not showing all) */}
+          {!showAllPhotos && (
+            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6">
+              {imageUrls.map((url, idx) => (
+                <div
+                  key={url + idx}
+                  className="break-inside-avoid-column group"
+                >
+                  <button
+                    className="relative block w-full overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-black"
+                    onClick={() => {
+                      setModalIndex(idx);
+                      setModalOpen(true);
+                    }}
+                    aria-label={`Open image ${idx + 1}`}
+                  >
+                    <div className={`aspect-${idx % 3 === 0 ? '[3/4]' : (idx % 3 === 1 ? '[1/1]' : '[4/5]')}`}>
+                      <Image
+                        src={url}
+                        alt={`Gallery image ${idx + 1}`}
+                        fill
+                        className="object-cover transition-all duration-500 group-hover:scale-105 will-change-transform"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                        priority={idx < 4}
+                      />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
+                          Photo {idx + 1}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Full gallery view (when showing all) */}
+          {showAllPhotos && (
+            <>
+              <div className="mb-8 flex justify-between items-center">
+                <h3 className={`text-2xl font-medium ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  All Photos ({allImageUrls.length})
+                </h3>
+                <button
+                  onClick={toggleAllPhotos}
+                  className={`px-4 py-2 rounded-full ${isDarkMode ? 
+                    'bg-white/20 text-white hover:bg-white/30' : 
+                    'bg-black/20 text-black hover:bg-black/30'} 
+                    transition-colors duration-300`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span>Back to Preview</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m15 18-6-6 6-6"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {allImageUrls.map((url, idx) => (
+                  <div
+                    key={url + idx}
+                    className="group"
+                  >
+                    <button
+                      className="relative block w-full overflow-hidden rounded-lg shadow-md hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      onClick={() => {
+                        setModalIndex(idx);
+                        setModalOpen(true);
+                      }}
+                      aria-label={`Open full image ${idx + 1}`}
+                    >
+                      <div className="aspect-square">
+                        <Image
+                          src={url}
+                          alt={`Gallery image ${idx + 1}`}
+                          fill
+                          className="object-cover transition-all duration-500 group-hover:scale-105"
+                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="absolute bottom-0 left-0 right-0 p-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                          <span className="inline-block px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
+                            #{idx + 1}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          
+          {/* Photo count and action button - only show when not in full view */}
+          {!showAllPhotos && (
+            <div className="mt-12 text-center">
+              <p className={`text-sm mb-4 ${isDarkMode ? 'text-white/50' : 'text-black/50'}`}>
+                {imageUrls.length} of {allImageUrls.length} photos shown
+              </p>
+              <button 
+                onClick={toggleAllPhotos}
+                className={`px-6 py-3 rounded-full ${isDarkMode ? 
+                  'bg-white text-black hover:bg-white/90' : 
+                  'bg-black text-white hover:bg-black/90'} 
+                  font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
+              >
+                View All Photos
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Enhanced Modal for full image view */}
+        {modalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm transition-all"
+            onClick={handleModalBackdropClick}
+          >
+            <div 
+              className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center" 
+              onClick={e => e.stopPropagation()}
+            >
+              <button
+                className="absolute -top-12 right-0 text-white/80 hover:text-white text-sm flex items-center gap-2 bg-white/10 rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none"
+                onClick={closeModal}
+                aria-label="Close modal"
+              >
+                <span>Close</span>
+                <span className="text-lg">×</span>
+              </button>
+              
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-black/50 to-black p-1">
+                <Image
+                  src={showAllPhotos ? allImageUrls[modalIndex] : imageUrls[modalIndex]}
+                  alt={`Full image ${modalIndex + 1}`}
+                  width={1200}
+                  height={900}
+                  className="max-h-[75vh] object-contain rounded-lg"
+                  priority
+                />
+              </div>
+              
+              <div className="flex items-center justify-between w-full mt-4 px-4">
+                <button
+                  className="text-white/80 hover:text-white flex items-center gap-2 focus:outline-none focus:text-white transition-colors duration-200"
+                  onClick={showPrevImage}
+                  aria-label="Previous image"
+                >
+                  <span className="text-2xl">←</span>
+                  <span className="hidden sm:inline">Previous</span>
+                </button>
+                
+                <div className="text-white/70 text-sm">
+                  {modalIndex + 1} / {showAllPhotos ? allImageUrls.length : imageUrls.length}
+                </div>
+                
+                <button
+                  className="text-white/80 hover:text-white flex items-center gap-2 focus:outline-none focus:text-white transition-colors duration-200"
+                  onClick={showNextImage}
+                  aria-label="Next image"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <span className="text-2xl">→</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
+
     </div>
   );
 }
