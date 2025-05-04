@@ -14,17 +14,19 @@ export default function Home() {
   const animationRef = useRef<number | null>(null);
   const mouseRef = useRef<THREE.Vector2>(new THREE.Vector2());
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [currentTheme, setCurrentTheme] = useState<'dark' | 'light' | 'blue' | 'red' | 'purple' | 'green'>('dark');
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [isMouseInteractionEnabled, setIsMouseInteractionEnabled] = useState(true);
-  const totalImages = 70;
+  const totalImages = 35;
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalIndex, setModalIndex] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [allImageUrls, setAllImageUrls] = useState<string[]>([]);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const themeSelectorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -40,7 +42,7 @@ export default function Home() {
       0.1,
       1000
     );
-    camera.position.z = 5;
+    camera.position.z = 7;
     cameraRef.current = camera;
 
     // Initialize renderer with higher quality settings
@@ -65,7 +67,7 @@ export default function Home() {
     scene.add(directionalLight);
     
     // Add point light with slight purple tint
-    const pointLight = new THREE.PointLight(0xf8e8ff, 0.6, 10);
+    const pointLight = new THREE.PointLight(0xf8e8ff, 1, 10);
     pointLight.position.set(-5, 3, 2);
     scene.add(pointLight);
     
@@ -105,8 +107,8 @@ export default function Home() {
     
     const imagesArray: THREE.Mesh[] = [];
 
-    // Create more images by using each source twice
-    [...imageFiles, ...imageFiles].forEach((src, index) => {
+    // Remove the duplication of images by removing the spread
+    imageFiles.forEach((src, index) => {
       textureLoader.load(src, (texture) => {
         // Improved texture quality
         texture.minFilter = THREE.LinearFilter;
@@ -313,6 +315,8 @@ export default function Home() {
         // Smoothly return to center when disabled
         cameraRef.current.position.x *= 0.95;
         cameraRef.current.position.y *= 0.95;
+        // Ensure camera straightens completely by approaching 0 directly
+       
         cameraRef.current.lookAt(0, 0, 0);
       }
 
@@ -492,9 +496,19 @@ export default function Home() {
     };
   }, [isMouseInteractionEnabled]);
 
-  const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-  };
+  // Add click outside handler for theme selector
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (themeSelectorRef.current && !themeSelectorRef.current.contains(event.target as Node)) {
+        setShowThemeSelector(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [themeSelectorRef]);
 
   const toggleMouseInteraction = () => {
     setIsMouseInteractionEnabled(!isMouseInteractionEnabled);
@@ -538,20 +552,134 @@ export default function Home() {
     }
   };
 
+  const toggleThemeSelector = () => {
+    setShowThemeSelector(!showThemeSelector);
+  };
+
+  const changeTheme = (theme: 'dark' | 'light' | 'blue' | 'red' | 'purple' | 'green') => {
+    setCurrentTheme(theme);
+    setShowThemeSelector(false);
+  };
+
+  // Theme-based color utility
+  const getThemeColors = () => {
+    switch (currentTheme) {
+      case 'light':
+        return {
+          bg: 'bg-white',
+          text: 'text-black',
+          textMuted: 'text-black/70',
+          border: 'border-black/20',
+          button: 'bg-black text-white',
+          buttonHover: 'hover:bg-black/90',
+          buttonOutline: 'border-black/20 text-black',
+          gradientFrom: 'from-white/90',
+          gradientVia: 'via-white/70',
+          overlay: 'bg-white/80',
+          card: 'bg-black/5',
+          modalBg: 'bg-white/95',
+          iconColor: 'text-black'
+        };
+      case 'blue':
+        return {
+          bg: 'bg-blue-900',
+          text: 'text-white',
+          textMuted: 'text-blue-100/70',
+          border: 'border-blue-300/30',
+          button: 'bg-blue-400 text-blue-900',
+          buttonHover: 'hover:bg-blue-300',
+          buttonOutline: 'border-blue-300/30 text-blue-100',
+          gradientFrom: 'from-blue-900/90',
+          gradientVia: 'via-blue-800/70',
+          overlay: 'bg-blue-900/80',
+          card: 'bg-blue-800/50',
+          modalBg: 'bg-blue-900/95',
+          iconColor: 'text-blue-200'
+        };
+      case 'red':
+        return {
+          bg: 'bg-red-900',
+          text: 'text-white',
+          textMuted: 'text-red-100/70',
+          border: 'border-red-300/30',
+          button: 'bg-red-400 text-red-900',
+          buttonHover: 'hover:bg-red-300',
+          buttonOutline: 'border-red-300/30 text-red-100',
+          gradientFrom: 'from-red-900/90',
+          gradientVia: 'via-red-800/70',
+          overlay: 'bg-red-900/80',
+          card: 'bg-red-800/50',
+          modalBg: 'bg-red-900/95',
+          iconColor: 'text-red-200'
+        };
+      case 'purple':
+        return {
+          bg: 'bg-purple-900',
+          text: 'text-white',
+          textMuted: 'text-purple-100/70',
+          border: 'border-purple-300/30',
+          button: 'bg-purple-400 text-purple-900',
+          buttonHover: 'hover:bg-purple-300',
+          buttonOutline: 'border-purple-300/30 text-purple-100',
+          gradientFrom: 'from-purple-900/90',
+          gradientVia: 'via-purple-800/70',
+          overlay: 'bg-purple-900/80',
+          card: 'bg-purple-800/50',
+          modalBg: 'bg-purple-900/95',
+          iconColor: 'text-purple-200'
+        };
+      case 'green':
+        return {
+          bg: 'bg-emerald-900',
+          text: 'text-white',
+          textMuted: 'text-emerald-100/70',
+          border: 'border-emerald-300/30',
+          button: 'bg-emerald-400 text-emerald-900',
+          buttonHover: 'hover:bg-emerald-300',
+          buttonOutline: 'border-emerald-300/30 text-emerald-100',
+          gradientFrom: 'from-emerald-900/90',
+          gradientVia: 'via-emerald-800/70',
+          overlay: 'bg-emerald-900/80',
+          card: 'bg-emerald-800/50',
+          modalBg: 'bg-emerald-900/95',
+          iconColor: 'text-emerald-200'
+        };
+      case 'dark':
+      default:
+        return {
+          bg: 'bg-black',
+          text: 'text-white',
+          textMuted: 'text-white/70',
+          border: 'border-white/20',
+          button: 'bg-white text-black',
+          buttonHover: 'hover:bg-white/90',
+          buttonOutline: 'border-white/20 text-white',
+          gradientFrom: 'from-black/90',
+          gradientVia: 'via-black/70',
+          overlay: 'bg-black/80',
+          card: 'bg-white/10',
+          modalBg: 'bg-black/95',
+          iconColor: 'text-white'
+        };
+    }
+  };
+
+  const themeColors = getThemeColors();
+
   return (
-    <div className={`${isDarkMode ? 'bg-black' : 'bg-white'}`}>
+    <div className={themeColors.bg}>
       <main className="relative min-h-screen overflow-hidden">
         {/* Background canvas for rotating images */}
         <div ref={containerRef} className="absolute inset-0 z-0"></div>
         
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black bg-opacity-80">
+          <div className={`absolute inset-0 z-20 flex items-center justify-center ${themeColors.overlay}`}>
             <div className="text-center">
-              <div className="text-white text-2xl mb-4">Loading images: {loadingProgress}%</div>
-              <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div className={`${themeColors.text} text-2xl mb-4`}>Loading images: {loadingProgress}%</div>
+              <div className={`w-64 h-2 ${themeColors.card} rounded-full overflow-hidden`}>
                 <div 
-                  className="h-full bg-white transition-all duration-300 ease-out" 
+                  className={`h-full ${themeColors.text} bg-current transition-all duration-300 ease-out`} 
                   style={{ width: `${loadingProgress}%` }}
                 ></div>
               </div>
@@ -564,25 +692,25 @@ export default function Home() {
           {/* Header */}
           <header className="p-4 flex justify-between items-center">
             <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-white/30"></div>
+              <div className={`w-8 h-8 rounded-full ${themeColors.card} flex items-center justify-center`}>
+                <div className={`w-4 h-4 rounded-full ${themeColors.border}`}></div>
               </div>
             </div>
             
             <nav className="flex space-x-6 items-center">
-              <Link href="#" className={`text-sm ${isDarkMode ? 'text-white/70' : 'text-black/70'} hover:opacity-100`}>
+              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
                 Manifesto
               </Link>
-              <Link href="#" className={`text-sm ${isDarkMode ? 'text-white/70' : 'text-black/70'} hover:opacity-100`}>
+              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
                 Careers
               </Link>
-              <Link href="#" className={`text-sm ${isDarkMode ? 'text-white/70' : 'text-black/70'} hover:opacity-100`}>
+              <Link href="#" className={`text-sm ${themeColors.textMuted} hover:opacity-100`}>
                 Discover
               </Link>
-              <Link href="#" className={`text-sm px-4 py-2 rounded-full border ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'}`}>
+              <Link href="#" className={`text-sm px-4 py-2 rounded-full border ${themeColors.buttonOutline}`}>
                 Log In
               </Link>
-              <Link href="#" className={`text-sm px-4 py-2 rounded-full ${isDarkMode ? 'bg-white text-black' : 'bg-black text-white'}`}>
+              <Link href="#" className={`text-sm px-4 py-2 rounded-full ${themeColors.button}`}>
                 Sign up
               </Link>
             </nav>
@@ -590,44 +718,80 @@ export default function Home() {
           
           {/* Main hero content */}
           <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-            <h1 className={`text-8xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+            <h1 className={`text-8xl font-bold mb-4 ${themeColors.text}`}>
               COSMOS<sup className="text-xl align-super">©</sup>
             </h1>
-            <p className={`text-xl ${isDarkMode ? 'text-white/70' : 'text-black/70'}`}>
-              A discovery engine for <span className={`px-3 py-1 rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-black/10'}`}>photographers</span>
+            <p className={`text-xl ${themeColors.textMuted}`}>
+              A discovery engine for <span className={`px-3 py-1 rounded-full ${themeColors.card}`}>photographers</span>
             </p>
           </div>
           
           {/* Footer with controls */}
           <footer className="p-4 flex justify-between items-center">
-            <div className="flex space-x-4">
+            <div className="relative" ref={themeSelectorRef}>
               <button 
-                onClick={toggleTheme}
-                className={`px-4 py-2 rounded-full border ${isDarkMode ? 'border-white/20 text-white' : 'border-black/20 text-black'}`}
+                onClick={toggleThemeSelector}
+                className={`px-4 py-2 rounded-full border ${themeColors.buttonOutline} flex items-center gap-2 relative z-30`}
               >
-                {isDarkMode ? 'Dark' : 'Light'}
+                <span>{currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1)}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
               </button>
-
+              
+              {showThemeSelector && (
+                <div className="fixed inset-0 z-40" onClick={() => setShowThemeSelector(false)}>
+                  <div 
+                    className={`absolute top-12 left-0 p-3 rounded-xl shadow-2xl ${themeColors.bg} border-2 ${themeColors.border} z-50 min-w-[200px]`} 
+                    style={{boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)'}}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="grid grid-cols-1 gap-2 w-full">
+                      {['dark', 'light', 'blue', 'red', 'purple', 'green'].map((theme) => (
+                        <button
+                          key={theme}
+                          onClick={() => changeTheme(theme as any)}
+                          className={`px-4 py-3 text-sm rounded-lg flex items-center gap-3 transition-colors w-full ${
+                            currentTheme === theme 
+                              ? `bg-opacity-30 ${themeColors.card} font-medium` 
+                              : 'hover:bg-opacity-10 hover:bg-gray-500'
+                          } ${themeColors.text}`}
+                        >
+                          <span className={`w-5 h-5 rounded-full flex-shrink-0 shadow-sm ${
+                            theme === 'dark' ? 'bg-gray-800 border border-gray-600' : 
+                            theme === 'light' ? 'bg-gray-200 border border-gray-300' :
+                            theme === 'blue' ? 'bg-blue-500 border border-blue-400' :
+                            theme === 'red' ? 'bg-red-500 border border-red-400' :
+                            theme === 'purple' ? 'bg-purple-500 border border-purple-400' :
+                            'bg-emerald-500 border border-emerald-400'
+                          }`}></span>
+                          <span>{theme.charAt(0).toUpperCase() + theme.slice(1)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
-            <div className={`text-sm ${isDarkMode ? 'text-white/50' : 'text-black/50'}`}>
+            <div className={`text-sm ${themeColors.textMuted}`}>
               Scroll to explore
             </div>
           </footer>
         </div>
       </main>
 
-      {/* Interactive Image Gallery Section */}
-      <section id="gallery-section" className="relative z-20 py-24 px-4 bg-gradient-to-b from-black/90 via-black/70 to-transparent">
+      {/* Interactive Image Gallery Section - Updated to support all themes */}
+      <section id="gallery-section" className={`relative z-20 py-24 px-4 bg-gradient-to-b ${themeColors.gradientFrom} ${themeColors.gradientVia} to-transparent`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-16 text-center">
-            <h2 className={`text-5xl font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+            <h2 className={`text-5xl font-bold mb-4 ${themeColors.text}`}>
               <span className="relative inline-block">
                 <span className="relative z-10">Gallery</span>
                 <span className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-purple-400 to-pink-500"></span>
               </span>
             </h2>
-            <p className={`text-lg max-w-2xl mx-auto ${isDarkMode ? 'text-white/70' : 'text-black/70'}`}>
+            <p className={`text-lg max-w-2xl mx-auto ${themeColors.textMuted}`}>
               Explore our curated collection of stunning photographs captured with precision and artistry
             </p>
           </div>
@@ -641,7 +805,7 @@ export default function Home() {
                   className="break-inside-avoid-column group"
                 >
                   <button
-                    className="relative block w-full overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-black"
+                    className="relative block w-full overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                     onClick={() => {
                       setModalIndex(idx);
                       setModalOpen(true);
@@ -658,7 +822,7 @@ export default function Home() {
                         priority={idx < 4}
                       />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
                       <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                         <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
                           Photo {idx + 1}
@@ -675,15 +839,12 @@ export default function Home() {
           {showAllPhotos && (
             <>
               <div className="mb-8 flex justify-between items-center">
-                <h3 className={`text-2xl font-medium ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                <h3 className={`text-2xl font-medium ${themeColors.text}`}>
                   All Photos ({allImageUrls.length})
                 </h3>
                 <button
                   onClick={toggleAllPhotos}
-                  className={`px-4 py-2 rounded-full ${isDarkMode ? 
-                    'bg-white/20 text-white hover:bg-white/30' : 
-                    'bg-black/20 text-black hover:bg-black/30'} 
-                    transition-colors duration-300`}
+                  className={`px-4 py-2 rounded-full ${themeColors.card} ${themeColors.text} hover:bg-opacity-50 transition-colors duration-300`}
                 >
                   <span className="flex items-center gap-2">
                     <span>Back to Preview</span>
@@ -717,7 +878,7 @@ export default function Home() {
                           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
                         />
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
                         <div className="absolute bottom-0 left-0 right-0 p-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                           <span className="inline-block px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
                             #{idx + 1}
@@ -734,15 +895,12 @@ export default function Home() {
           {/* Photo count and action button - only show when not in full view */}
           {!showAllPhotos && (
             <div className="mt-12 text-center">
-              <p className={`text-sm mb-4 ${isDarkMode ? 'text-white/50' : 'text-black/50'}`}>
+              <p className={`text-sm mb-4 ${themeColors.textMuted}`}>
                 {imageUrls.length} of {allImageUrls.length} photos shown
               </p>
               <button 
                 onClick={toggleAllPhotos}
-                className={`px-6 py-3 rounded-full ${isDarkMode ? 
-                  'bg-white text-black hover:bg-white/90' : 
-                  'bg-black text-white hover:bg-black/90'} 
-                  font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
+                className={`px-6 py-3 rounded-full ${themeColors.button} ${themeColors.buttonHover} font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
               >
                 View All Photos
               </button>
@@ -753,7 +911,7 @@ export default function Home() {
         {/* Enhanced Modal for full image view */}
         {modalOpen && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm transition-all"
+            className={`fixed inset-0 z-50 flex items-center justify-center ${themeColors.modalBg} backdrop-blur-sm transition-all`}
             onClick={handleModalBackdropClick}
           >
             <div 
@@ -761,7 +919,7 @@ export default function Home() {
               onClick={e => e.stopPropagation()}
             >
               <button
-                className="absolute -top-12 right-0 text-white/80 hover:text-white text-sm flex items-center gap-2 bg-white/10 rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none"
+                className={`absolute -top-12 right-0 ${themeColors.iconColor} hover:opacity-100 opacity-80 text-sm flex items-center gap-2 ${themeColors.card} rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none`}
                 onClick={closeModal}
                 aria-label="Close modal"
               >
@@ -782,7 +940,7 @@ export default function Home() {
               
               <div className="flex items-center justify-between w-full mt-4 px-4">
                 <button
-                  className="text-white/80 hover:text-white flex items-center gap-2 focus:outline-none focus:text-white transition-colors duration-200"
+                  className={`${themeColors.iconColor} opacity-80 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-opacity duration-200`}
                   onClick={showPrevImage}
                   aria-label="Previous image"
                 >
@@ -790,12 +948,12 @@ export default function Home() {
                   <span className="hidden sm:inline">Previous</span>
                 </button>
                 
-                <div className="text-white/70 text-sm">
+                <div className={`${themeColors.textMuted} text-sm`}>
                   {modalIndex + 1} / {showAllPhotos ? allImageUrls.length : imageUrls.length}
                 </div>
                 
                 <button
-                  className="text-white/80 hover:text-white flex items-center gap-2 focus:outline-none focus:text-white transition-colors duration-200"
+                  className={`${themeColors.iconColor} opacity-80 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-opacity duration-200`}
                   onClick={showNextImage}
                   aria-label="Next image"
                 >
