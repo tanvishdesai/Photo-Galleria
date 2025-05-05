@@ -17,7 +17,7 @@ export default function Home() {
   const [currentTheme, setCurrentTheme] = useState<'dark' | 'light' | 'blue' | 'red' | 'purple' | 'green'>('dark');
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const [imagesLoaded, setImagesLoaded] = useState(0);
-  const [isMouseInteractionEnabled, setIsMouseInteractionEnabled] = useState(true);
+  const [isMouseInteractionEnabled] = useState(true);
   const totalImages = 35;
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -29,7 +29,7 @@ export default function Home() {
   const themeSelectorRef = useRef<HTMLDivElement>(null);
   const mouseVelocityRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
   const lastMousePositionRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
-  const [mouseParallaxEnabled, setMouseParallaxEnabled] = useState(true);
+  const [mouseParallaxEnabled] = useState(true);
   const targetCameraPositionRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 7));
 
   useEffect(() => {
@@ -279,7 +279,7 @@ export default function Home() {
     };
 
     // Handle mouse click on 3D objects
-    const handleMouseClick = (event: MouseEvent) => {
+    const handleMouseClick = () => {
       if (!isMouseInteractionEnabled || !sceneRef.current || !cameraRef.current || !raycasterRef.current) return;
       
       // Check for intersections with 3D images
@@ -654,9 +654,6 @@ export default function Home() {
     };
   }, [themeSelectorRef]);
 
-  const toggleMouseInteraction = () => {
-    setIsMouseInteractionEnabled(!isMouseInteractionEnabled);
-  };
 
   // Loading indicator calculation
   const loadingProgress = Math.round((imagesLoaded / totalImages) * 100);
@@ -813,9 +810,6 @@ export default function Home() {
   const themeColors = getThemeColors();
 
   // Add new toggle for parallax effects
-  const toggleParallaxEffects = () => {
-    setMouseParallaxEnabled(!mouseParallaxEnabled);
-  };
 
   return (
     <div className={themeColors.bg}>
@@ -900,7 +894,7 @@ export default function Home() {
                       {['dark', 'light', 'blue', 'red', 'purple', 'green'].map((theme) => (
                         <button
                           key={theme}
-                          onClick={() => changeTheme(theme as any)}
+                          onClick={() => changeTheme(theme as 'dark' | 'light' | 'blue' | 'red' | 'purple' | 'green')}
                           className={`px-4 py-3 text-sm rounded-lg flex items-center gap-3 transition-colors w-full ${
                             currentTheme === theme 
                               ? `bg-opacity-30 ${themeColors.card} font-medium` 
