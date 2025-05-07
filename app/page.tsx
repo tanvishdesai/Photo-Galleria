@@ -31,6 +31,7 @@ export default function Home() {
   const lastMousePositionRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
   const [mouseParallaxEnabled] = useState(true);
   const targetCameraPositionRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 7));
+  const [startBurst, setStartBurst] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -233,7 +234,7 @@ export default function Home() {
             y: (Math.random() - 0.5) * 0.002,
             z: (Math.random() - 0.5) * 0.001,
           },
-          animationPhase: 'burst', // 'burst' or 'drift'
+          animationPhase: 'waiting', // Start as 'waiting' instead of 'burst'
           bounds: { x: boundX, y: boundY, z: boundZ },
           minZ: minZ, // Store minimum Z value
           floatingEffect: {
@@ -639,6 +640,19 @@ export default function Home() {
       });
     };
   }, [isMouseInteractionEnabled]);
+
+  useEffect(() => {
+    if (imagesLoaded === totalImages) {
+      setStartBurst(true);
+    }
+  }, [imagesLoaded, totalImages]);
+
+  imagesRef.current.forEach((mesh) => {
+    // Start burst for all images when startBurst is true
+    if (mesh.userData.animationPhase === 'waiting' && startBurst) {
+      mesh.userData.animationPhase = 'burst';
+    }
+  });
 
   // Add click outside handler for theme selector
   useEffect(() => {
