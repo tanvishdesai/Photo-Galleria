@@ -22,7 +22,6 @@ export default function Home() {
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalIndex, setModalIndex] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [allImageUrls, setAllImageUrls] = useState<string[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
@@ -30,6 +29,7 @@ export default function Home() {
   const heroRef = useRef<HTMLDivElement>(null);
   const mouseVelocityRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
   const lastMousePositionRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
+  const gradientRef = useRef<HTMLDivElement>(null);
   
   const [startBurst, setStartBurst] = useState(false);
   // Refs for gallery image containers
@@ -308,6 +308,20 @@ export default function Home() {
       mouseRef.current.y = - (event.clientY / window.innerHeight) * 2 + 1;
       mouseVelocityRef.current.x = mouseRef.current.x - lastMousePositionRef.current.x;
       mouseVelocityRef.current.y = mouseRef.current.y - lastMousePositionRef.current.y;
+      
+      // Update gradient position based on mouse with smoother movement
+      if (gradientRef.current) {
+        // Increase mouse effect for more dramatic movement (35% from center)
+        const gradientX = 50 + (mouseRef.current.x * 35); 
+        const gradientY = 50 + (mouseRef.current.y * 35);
+        
+        // Add velocity component for more fluid, dynamic feeling
+        const velocityFactor = 20;
+        const velocityX = mouseVelocityRef.current.x * velocityFactor;
+        const velocityY = mouseVelocityRef.current.y * velocityFactor;
+        
+        gradientRef.current.style.backgroundPosition = `${gradientX + velocityX}% ${gradientY + velocityY}%`;
+      }
     };
     const handleMouseClick = () => {
       if (!isMouseInteractionEnabled || !sceneRef.current || !cameraRef.current || !raycasterRef.current) return;
@@ -337,7 +351,6 @@ export default function Home() {
           }
           setTimeout(() => {
             if (imageIndex >= 0 && imageIndex < allImageUrls.length) {
-              setModalIndex(imageIndex);
               setShowAllPhotos(true);
               setModalOpen(true);
             }
@@ -670,28 +683,16 @@ export default function Home() {
   const isLoading = imagesLoaded < totalImages;
 
   const closeModal = () => setModalOpen(false);
-  const showPrevImage = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const currentArray = showAllPhotos ? allImageUrls : imageUrls;
-    setModalIndex((prev) => (prev - 1 + currentArray.length) % currentArray.length);
-  };
-  const showNextImage = (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    const currentArray = showAllPhotos ? allImageUrls : imageUrls;
-    setModalIndex((prev) => (prev + 1) % currentArray.length);
-  };
-  const handleModalBackdropClick = () => closeModal();
+
   // Handle Esc key to close modal
   useEffect(() => {
     if (!modalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') closeModal();
-      if (e.key === 'ArrowLeft') showPrevImage();
-      if (e.key === 'ArrowRight') showNextImage();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [modalOpen, imageUrls.length]);
+  }, [modalOpen]);
 
   // Toggle full gallery view
   const toggleAllPhotos = () => {
@@ -731,7 +732,8 @@ export default function Home() {
           overlay: 'bg-white/80',
           card: 'bg-black/5',
           modalBg: 'bg-white/95',
-          iconColor: 'text-black'
+          iconColor: 'text-black',
+          gradient: 'bg-gradient-light'
         };
       case 'blue':
         return {
@@ -747,7 +749,8 @@ export default function Home() {
           overlay: 'bg-blue-900/80',
           card: 'bg-blue-800/50',
           modalBg: 'bg-blue-900/95',
-          iconColor: 'text-blue-200'
+          iconColor: 'text-blue-200',
+          gradient: 'bg-gradient-blue'
         };
       case 'red':
         return {
@@ -763,7 +766,8 @@ export default function Home() {
           overlay: 'bg-red-900/80',
           card: 'bg-red-800/50',
           modalBg: 'bg-red-900/95',
-          iconColor: 'text-red-200'
+          iconColor: 'text-red-200',
+          gradient: 'bg-gradient-red'
         };
       case 'purple':
         return {
@@ -779,7 +783,8 @@ export default function Home() {
           overlay: 'bg-purple-900/80',
           card: 'bg-purple-800/50',
           modalBg: 'bg-purple-900/95',
-          iconColor: 'text-purple-200'
+          iconColor: 'text-purple-200',
+          gradient: 'bg-gradient-purple'
         };
       case 'green':
         return {
@@ -795,7 +800,8 @@ export default function Home() {
           overlay: 'bg-emerald-900/80',
           card: 'bg-emerald-800/50',
           modalBg: 'bg-emerald-900/95',
-          iconColor: 'text-emerald-200'
+          iconColor: 'text-emerald-200',
+          gradient: 'bg-gradient-green'
         };
       case 'dark':
       default:
@@ -812,7 +818,8 @@ export default function Home() {
           overlay: 'bg-black/80',
           card: 'bg-white/10',
           modalBg: 'bg-black/95',
-          iconColor: 'text-white'
+          iconColor: 'text-white',
+          gradient: 'bg-gradient-dark'
         };
     }
   };
@@ -832,6 +839,17 @@ export default function Home() {
       >
         {/* Background canvas for rotating images */}
         <div ref={containerRef} className="absolute inset-0 z-0"></div>
+        
+        {/* Animated gradient background that responds to mouse */}
+        <div 
+          ref={gradientRef}
+          className={`absolute inset-0 z-[1] ${themeColors.gradient} transition-all duration-300 ease-out opacity-70`}
+          style={{
+            backgroundSize: '200% 200%',
+            backgroundPosition: '50% 50%'
+          }}
+          aria-hidden="true"
+        ></div>
         
         {/* Loading overlay */}
         {isLoading && (
@@ -965,42 +983,67 @@ export default function Home() {
           
           {/* Masonry layout for gallery preview (when not showing all) */}
           {!showAllPhotos && (
-            <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6">
-              {imageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
-                <div
-                  key={url + idx}
-                  className="break-inside-avoid-column group opacity-0"
-                  ref={el => setPreviewImageRef(el, idx)}
+            <>
+              <div className="relative min-h-[600px] flex flex-wrap justify-center items-center" style={{ perspective: '1200px' }}>
+                {imageUrls.filter(url => url && url.trim() !== '').map((url, idx) => {
+                  // Generate random rotation and translation for each image
+                  const rotate = (Math.random() - 0.5) * 18; // -9deg to +9deg
+                  const translateX = (Math.random() - 0.5) * 40; // -20px to +20px
+                  const translateY = (Math.random() - 0.5) * 40; // -20px to +20px
+                  const zIndex = 10 + idx;
+                  return (
+                    <div
+                      key={url + idx}
+                      className="polaroid-photo group opacity-0 absolute"
+                      ref={el => setPreviewImageRef(el, idx)}
+                      style={{
+                        transform: `rotate(${rotate}deg) translate(${translateX}px, ${translateY}px)`,
+                        zIndex,
+                        left: `calc(${(idx % 4) * 22 + 10}% - 80px)`, // spread horizontally
+                        top: `calc(${Math.floor(idx / 4) * 32 + 5}% - 80px)`, // spread vertically
+                        transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s',
+                        width: '180px',
+                        maxWidth: '90vw',
+                      }}
+                    >
+                      <button
+                        className="relative block w-full overflow-visible focus:outline-none"
+                        onClick={() => {
+                          setModalOpen(true);
+                        }}
+                        aria-label={`Open image ${idx + 1}`}
+                        style={{ background: 'none', border: 'none', padding: 0 }}
+                      >
+                        <div className="polaroid-frame">
+                          <div className="relative aspect-[3/4] w-full h-[220px] bg-white rounded-lg shadow-xl border border-gray-200 flex items-center justify-center">
+                            <Image
+                              src={url}
+                              alt={`Gallery image ${idx + 1}`}
+                              fill
+                              className="object-cover rounded-md polaroid-img"
+                              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                              priority={idx < 4}
+                            />
+                          </div>
+                          <div className="text-center text-xs text-gray-700 font-semibold mt-2 polaroid-caption">
+                            Photo {idx + 1}
+                          </div>
+                        </div>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-center mt-12">
+                <button
+                  onClick={toggleAllPhotos}
+                  className="px-6 py-3 rounded-full beauty-btn bg-white/80 text-black font-semibold shadow-lg hover:bg-white/90 transition-colors duration-300 border border-gray-200"
+                  style={{ fontSize: '1.1rem' }}
                 >
-                  <button
-                    className="relative block w-full overflow-hidden rounded-xl beauty-btn focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
-                    onClick={() => {
-                      setModalIndex(idx);
-                      setModalOpen(true);
-                    }}
-                    aria-label={`Open image ${idx + 1}`}
-                  >
-                    <div className={`aspect-${idx % 3 === 0 ? '[3/4]' : (idx % 3 === 1 ? '[1/1]' : '[4/5]')}`}>
-                      <Image
-                        src={url}
-                        alt={`Gallery image ${idx + 1}`}
-                        fill
-                        className="object-cover beauty-img fadein"
-                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
-                        priority={idx < 4}
-                      />
-                    </div>
-                    <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 glass`}>
-                      <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                        <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
-                          Photo {idx + 1}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              ))}
-            </div>
+                  View All Photos
+                </button>
+              </div>
+            </>
           )}
           
           {/* Full gallery view (when showing all) */}
@@ -1022,36 +1065,35 @@ export default function Home() {
                   </span>
                 </button>
               </div>
-              
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-8">
                 {allImageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
                   <div
                     key={url + idx}
-                    className="group opacity-0"
+                    className="polaroid-photo group opacity-0"
                     ref={el => setFullImageRef(el, idx)}
+                    style={{ transition: 'transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s' }}
                   >
                     <button
-                      className="relative block w-full overflow-hidden rounded-lg beauty-btn focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="relative block w-full overflow-visible focus:outline-none"
                       onClick={() => {
-                        setModalIndex(idx);
                         setModalOpen(true);
                       }}
                       aria-label={`Open full image ${idx + 1}`}
+                      style={{ background: 'none', border: 'none', padding: 0 }}
                     >
-                      <div className="aspect-square">
-                        <Image
-                          src={url}
-                          alt={`Gallery image ${idx + 1}`}
-                          fill
-                          className="object-cover beauty-img fadein"
-                          sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
-                        />
-                      </div>
-                      <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 glass`}>
-                        <div className="absolute bottom-0 left-0 right-0 p-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                          <span className="inline-block px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
-                            #{idx + 1}
-                          </span>
+                      <div className="polaroid-frame">
+                        <div className="relative aspect-[3/4] w-full h-[220px] bg-white rounded-lg shadow-xl border border-gray-200 flex items-center justify-center">
+                          <Image
+                            src={url}
+                            alt={`Gallery image ${idx + 1}`}
+                            fill
+                            className="object-cover rounded-md polaroid-img"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+                            priority={idx < 4}
+                          />
+                        </div>
+                        <div className="text-center text-xs text-gray-700 font-semibold mt-2 polaroid-caption">
+                          Photo {idx + 1}
                         </div>
                       </div>
                     </button>
@@ -1060,101 +1102,8 @@ export default function Home() {
               </div>
             </>
           )}
-          
-          {/* Photo count and action button - only show when not in full view */}
-          {!showAllPhotos && (
-            <div className="mt-12 text-center">
-              <p className={`text-sm mb-4 ${themeColors.textMuted}`}>
-                {imageUrls.length} of {allImageUrls.length} photos shown
-              </p>
-              <button 
-                onClick={toggleAllPhotos}
-                className={`px-6 py-3 rounded-full beauty-btn ${themeColors.button} ${themeColors.buttonHover} font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
-              >
-                View All Photos
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Enhanced Modal for full image view */}
-        {modalOpen && (
-          <>
-            {/* Soft vignette overlay for modal */}
-            <div className="vignette-bg z-40 pointer-events-none" />
-            <div
-              className={`fixed inset-0 z-50 flex items-center justify-center glass ${themeColors.modalBg} backdrop-blur-sm transition-all theme-modal`}
-              onClick={handleModalBackdropClick}
-            >
-              <div 
-                className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center animate-modal-pop shadow-2xl border-2 border-white/20 dark:border-black/30 bg-gradient-to-b from-black/60 to-black/80"
-                onClick={e => e.stopPropagation()}
-                style={{ boxShadow: '0 16px 48px 0 rgba(31,38,135,0.22), 0 4px 24px 0 rgba(0,0,0,0.18)' }}
-              >
-                <button
-                  className={`absolute -top-12 right-0 beauty-btn ${themeColors.iconColor} hover:opacity-100 opacity-80 text-sm flex items-center gap-2 ${themeColors.card} rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none`}
-                  onClick={closeModal}
-                  aria-label="Close modal"
-                >
-                  <span>Close</span>
-                  <span className="text-lg theme-close-anim">×</span>
-                </button>
-                
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-black/60 to-black/90 p-2 animate-image-fadein">
-                  {(() => {
-                    // Use the appropriate image array based on source
-                    const currentImageArray = showAllPhotos ? allImageUrls : imageUrls;
-                    
-                    // Ensure modalIndex is within bounds
-                    const safeModalIndex = Math.min(Math.max(0, modalIndex), currentImageArray.length - 1);
-                    const imageSrc = currentImageArray[safeModalIndex] || '';
-                    
-                    return imageSrc && imageSrc.trim() !== '' ? (
-                      <Image
-                        src={imageSrc}
-                        alt={`Full image ${safeModalIndex + 1}`}
-                        width={1200}
-                        height={900}
-                        className="max-h-[75vh] object-contain rounded-xl shadow-xl border border-white/10 animate-image-pop"
-                        priority
-                      />
-                    ) : (
-                      <div className="w-[1200px] h-[900px] max-h-[75vh] flex items-center justify-center text-gray-400">
-                        Image not available
-                      </div>
-                    );
-                  })()}
-                </div>
-                
-                <div className="flex items-center justify-between w-full mt-4 px-4">
-                  <button
-                    className={`${themeColors.iconColor} opacity-90 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-all duration-200 text-2xl sm:text-3xl px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 shadow-md border border-white/20 nav-arrow-btn`}
-                    onClick={showPrevImage}
-                    aria-label="Previous image"
-                  >
-                    <span className="theme-arrow-anim">←</span>
-                    <span className="hidden sm:inline text-base font-medium">Previous</span>
-                  </button>
-                  
-                  <div className={`${themeColors.textMuted} text-sm sm:text-base font-medium`}>
-                    {modalIndex + 1} / {(showAllPhotos ? allImageUrls : imageUrls).length}
-                  </div>
-                  
-                  <button
-                    className={`${themeColors.iconColor} opacity-90 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-all duration-200 text-2xl sm:text-3xl px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 shadow-md border border-white/20 nav-arrow-btn`}
-                    onClick={showNextImage}
-                    aria-label="Next image"
-                  >
-                    <span className="hidden sm:inline text-base font-medium">Next</span>
-                    <span className="theme-arrow-anim">→</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </section>
-
     </div>
   );
 }

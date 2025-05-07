@@ -247,3 +247,116 @@ canvas {
   box-shadow: 0 0 0 4px #00dbde22;
   transform: scale(1.08) translateY(-2px);
 }
+
+/* Mouse-responsive gradient backgrounds */
+.bg-gradient-dark {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(60, 60, 70, 0.5) 0%, 
+    rgba(40, 40, 45, 0.6) 25%, 
+    rgba(25, 25, 30, 0.8) 50%,
+    rgba(10, 10, 15, 0.95) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
+}
+
+.bg-gradient-light {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(255, 255, 255, 1) 0%, 
+    rgba(250, 250, 250, 0.9) 30%, 
+    rgba(245, 245, 245, 0.8) 60%,
+    rgba(235, 235, 235, 0.7) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(200, 200, 200, 0.3);
+}
+
+.bg-gradient-blue {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(56, 139, 253, 0.4) 0%, 
+    rgba(37, 99, 235, 0.5) 25%, 
+    rgba(30, 64, 175, 0.7) 50%, 
+    rgba(17, 24, 90, 0.9) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(30, 58, 138, 0.5);
+}
+
+.bg-gradient-red {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(252, 105, 105, 0.4) 0%, 
+    rgba(239, 68, 68, 0.5) 25%, 
+    rgba(185, 28, 28, 0.7) 55%,
+    rgba(120, 20, 20, 0.9) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(153, 27, 27, 0.5);
+}
+
+.bg-gradient-purple {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(167, 139, 250, 0.4) 0%, 
+    rgba(139, 92, 246, 0.5) 25%, 
+    rgba(109, 40, 217, 0.7) 55%,
+    rgba(76, 29, 149, 0.9) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(88, 28, 135, 0.5);
+}
+
+.bg-gradient-green {
+  background: radial-gradient(
+    circle at 50% 50%, 
+    rgba(52, 211, 153, 0.4) 0%, 
+    rgba(16, 185, 129, 0.5) 25%, 
+    rgba(6, 95, 70, 0.7) 55%,
+    rgba(6, 78, 59, 0.9) 85%
+  );
+  transition: background-position 0.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+  box-shadow: inset 0 0 100px rgba(6, 78, 59, 0.5);
+}
+
+/* --- Polaroid Scattered Gallery Styles --- */
+.polaroid-photo {
+  box-sizing: border-box;
+  cursor: pointer;
+  user-select: none;
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.13));
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s, z-index 0.2s;
+}
+.polaroid-photo:hover, .polaroid-photo:focus-within {
+  transform: rotate(0deg) scale(1.12) translateY(-12px) !important;
+  z-index: 99 !important;
+  box-shadow: 0 12px 40px 0 rgba(0,0,0,0.22), 0 0 0 6px rgba(0, 221, 222, 0.10);
+}
+.polaroid-frame {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.13), 0 1.5px 0 #fff;
+  padding: 10px 10px 24px 10px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.polaroid-img {
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.10);
+  transition: filter 0.25s;
+}
+.polaroid-photo:hover .polaroid-img,
+.polaroid-photo:focus-within .polaroid-img {
+  filter: brightness(1.08) saturate(1.15) drop-shadow(0 0 16px #00dbde88);
+}
+.polaroid-caption {
+  font-family: 'Courier New', Courier, monospace;
+  letter-spacing: 0.02em;
+  margin-top: 0.5rem;
+  color: #444;
+  text-shadow: 0 1px 0 #fff, 0 2px 8px rgba(0,0,0,0.08);
+}
