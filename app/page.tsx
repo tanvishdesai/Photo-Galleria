@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 import Image from "next/image";
 import Link from "next/link";
@@ -27,11 +27,50 @@ export default function Home() {
   const [allImageUrls, setAllImageUrls] = useState<string[]>([]);
   const [showThemeSelector, setShowThemeSelector] = useState(false);
   const themeSelectorRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
   const mouseVelocityRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
   const lastMousePositionRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
-  const [mouseParallaxEnabled] = useState(true);
-  const targetCameraPositionRef = useRef<THREE.Vector3>(new THREE.Vector3(0, 0, 7));
+  
   const [startBurst, setStartBurst] = useState(false);
+  // Refs for gallery image containers
+  const previewImageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const fullImageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  // Add time and velocity refs for physics-based movement
+  const lastFrameTimeRef = useRef<number>(performance.now());
+  const cameraVelocityRef = useRef<THREE.Vector3>(new THREE.Vector3());
+
+  // Helper to add refs to array
+  const setPreviewImageRef = useCallback((el: HTMLDivElement | null, idx: number) => {
+    previewImageRefs.current[idx] = el;
+  }, []);
+  const setFullImageRef = useCallback((el: HTMLDivElement | null, idx: number) => {
+    fullImageRefs.current[idx] = el;
+  }, []);
+
+  // Intersection Observer for scroll-to-reveal
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const reveal = (entries: IntersectionObserverEntry[], observer: IntersectionObserver) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('slidein');
+          observer.unobserve(entry.target);
+        }
+      });
+    };
+    const observer = new window.IntersectionObserver(reveal, {
+      threshold: 0.18
+    });
+    // Observe preview images
+    previewImageRefs.current.forEach(ref => {
+      if (ref) observer.observe(ref);
+    });
+    // Observe full gallery images
+    fullImageRefs.current.forEach(ref => {
+      if (ref) observer.observe(ref);
+    });
+    return () => observer.disconnect();
+  }, [imageUrls, allImageUrls, showAllPhotos]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -254,47 +293,30 @@ export default function Home() {
     
     imagesRef.current = imagesArray;
 
-    // Handle window resize
+    // Stable event handlers for listeners
     const handleResize = () => {
       if (!cameraRef.current || !rendererRef.current) return;
-      
       cameraRef.current.aspect = window.innerWidth / window.innerHeight;
       cameraRef.current.updateProjectionMatrix();
       rendererRef.current.setSize(window.innerWidth, window.innerHeight);
       rendererRef.current.setPixelRatio(window.devicePixelRatio);
     };
-    
-    // Handle mouse movement with velocity tracking
     const handleMouseMove = (event: MouseEvent) => {
-      // Update last mouse position
       lastMousePositionRef.current.x = mouseRef.current.x;
       lastMousePositionRef.current.y = mouseRef.current.y;
-      
-      // Update mouse position in normalized device coordinates (-1 to +1)
       mouseRef.current.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouseRef.current.y = - (event.clientY / window.innerHeight) * 2 + 1;
-      
-      // Calculate velocity (for inertia effects)
       mouseVelocityRef.current.x = mouseRef.current.x - lastMousePositionRef.current.x;
       mouseVelocityRef.current.y = mouseRef.current.y - lastMousePositionRef.current.y;
     };
-
-    // Handle mouse click on 3D objects
     const handleMouseClick = () => {
       if (!isMouseInteractionEnabled || !sceneRef.current || !cameraRef.current || !raycasterRef.current) return;
-      
-      // Check for intersections with 3D images
       raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
       const intersects = raycasterRef.current.intersectObjects(imagesRef.current);
-      
       if (intersects.length > 0) {
         const clickedMesh = intersects[0].object as THREE.Mesh;
         const imageIndex = clickedMesh.userData.imageIndex;
-        
-        // Play quick scale animation
         const originalScale = clickedMesh.userData.originalScale;
-        
-        // Timeline of quick animation on click
         const scaleUp = () => {
           if (originalScale) {
             clickedMesh.scale.set(
@@ -305,7 +327,6 @@ export default function Home() {
           }
           setTimeout(scaleDown, 100);
         };
-        
         const scaleDown = () => {
           if (originalScale) {
             clickedMesh.scale.set(
@@ -315,20 +336,18 @@ export default function Home() {
             );
           }
           setTimeout(() => {
-            // Open modal with this image - ensure it's within the valid range
-            // We need to make sure we're using the correct image source
             if (imageIndex >= 0 && imageIndex < allImageUrls.length) {
               setModalIndex(imageIndex);
-              setShowAllPhotos(true); // Set to true to use allImageUrls
+              setShowAllPhotos(true);
               setModalOpen(true);
             }
           }, 100);
         };
-        
         scaleUp();
       }
     };
 
+    // Add event listeners ONCE
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('click', handleMouseClick);
     window.addEventListener('resize', handleResize);
@@ -415,53 +434,37 @@ export default function Home() {
     const animate = () => {
       if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
       
-      // Update camera position based on mouse only if interaction is enabled
-      if (cameraRef.current && isMouseInteractionEnabled) {
-        // Apply inertia effect for smoother camera movement
-        if (mouseParallaxEnabled) {
-          // Calculate target position with parallax
-          targetCameraPositionRef.current.x = mouseRef.current.x * 3;
-          targetCameraPositionRef.current.y = mouseRef.current.y * 2;
-          
-          // Apply velocity factor for momentum
-          const momentumFactor = 0.3;
-          targetCameraPositionRef.current.x += mouseVelocityRef.current.x * 20 * momentumFactor;
-          targetCameraPositionRef.current.y += mouseVelocityRef.current.y * 20 * momentumFactor;
-          
-          // Smooth transition to target with dynamic damping
-          const damping = 0.05 + (Math.abs(mouseVelocityRef.current.x) + Math.abs(mouseVelocityRef.current.y)) * 0.01;
-          cameraRef.current.position.x += (targetCameraPositionRef.current.x - cameraRef.current.position.x) * damping;
-          cameraRef.current.position.y += (targetCameraPositionRef.current.y - cameraRef.current.position.y) * damping;
-          
-          // Dynamic Z position based on mouse movement (slight zoom effect)
-          const baseZ = 7;
-          const zVariation = Math.abs(mouseRef.current.x * mouseRef.current.y) * 1.5;
-          targetCameraPositionRef.current.z = baseZ - zVariation;
-          cameraRef.current.position.z += (targetCameraPositionRef.current.z - cameraRef.current.position.z) * 0.03;
-          
-          // Apply subtle tilt effect based on mouse position
-          cameraRef.current.rotation.x = mouseRef.current.y * 0.1;
-          cameraRef.current.rotation.y = -mouseRef.current.x * 0.1;
-        } else {
-          // Original camera movement logic without parallax
-          const targetX = mouseRef.current.x * 2;
-          const targetY = mouseRef.current.y * 2;
-          cameraRef.current.position.x += (targetX - cameraRef.current.position.x) * 0.05;
-          cameraRef.current.position.y += (targetY - cameraRef.current.position.y) * 0.05;
-          cameraRef.current.lookAt(0, 0, 0);
-        }
-        
-        // Gradually decay mouse velocity
-        mouseVelocityRef.current.x *= 0.95;
-        mouseVelocityRef.current.y *= 0.95;
-      } else if (cameraRef.current) {
-        // Smoothly return to center when disabled
-        cameraRef.current.position.x *= 0.95;
-        cameraRef.current.position.y *= 0.95;
-        cameraRef.current.rotation.x *= 0.95;
-        cameraRef.current.rotation.y *= 0.95;
-        cameraRef.current.position.z += (7 - cameraRef.current.position.z) * 0.05;
+      // Compute frame time delta for physics
+      const now = performance.now();
+      const dt = (now - lastFrameTimeRef.current) / 1000;
+      lastFrameTimeRef.current = now;
+
+      // Spring-based physics for camera movement
+      if (cameraRef.current) {
+        // Compute desired target from mouse state
+        const baseZ = 7;
+        const zVar = Math.abs(mouseRef.current.x * mouseRef.current.y) * 1.5;
+        const desired = new THREE.Vector3(mouseRef.current.x * 3, mouseRef.current.y * 2, baseZ - zVar);
+        // Spring stiffness and damping
+        const k = 30;
+        const d = 2 * Math.sqrt(k);
+        // Forces: F = -k*x - d*v
+        const disp = new THREE.Vector3().subVectors(desired, cameraRef.current.position);
+        const springF = disp.multiplyScalar(k);
+        const dampF = cameraVelocityRef.current.clone().multiplyScalar(-d);
+        const accel = springF.add(dampF);
+        // Integrate velocity and position
+        cameraVelocityRef.current.add(accel.multiplyScalar(dt));
+        cameraRef.current.position.add(cameraVelocityRef.current.clone().multiplyScalar(dt));
         cameraRef.current.lookAt(0, 0, 0);
+      }
+
+      // Parallax hero text movement
+      if (heroRef.current && cameraRef.current) {
+        const factor = 50;
+        const hx = cameraRef.current.position.x * factor;
+        const hy = cameraRef.current.position.y * factor;
+        heroRef.current.style.transform = `translate3d(${hx}px, ${-hy}px, 0)`;
       }
 
       // Update mouse interaction only if enabled
@@ -484,41 +487,35 @@ export default function Home() {
         mesh.rotation.z += mesh.userData.rotationSpeed.z;
         
         if (mesh.userData.animationPhase === 'burst') {
-          // ---- IMPROVED PHYSICS - BURST ANIMATION ----
-          // Apply velocity-based movement with improved physics
-          mesh.position.x += mesh.userData.currentVelocity.x;
-          mesh.position.y += mesh.userData.currentVelocity.y;
-          mesh.position.z += mesh.userData.currentVelocity.z;
-          
-          // Enhanced bounce physics with variable elasticity
-          const elasticity = 0.65; // More controlled bounce
-          
-          // Check if image is going outside bounds with improved bouncing
+          // Integrate burst velocity with delta time
+          mesh.position.x += mesh.userData.currentVelocity.x * dt * 60;
+          mesh.position.y += mesh.userData.currentVelocity.y * dt * 60;
+          mesh.position.z += mesh.userData.currentVelocity.z * dt * 60;
+
+          const elasticity = 0.65;
+
           if (Math.abs(mesh.position.x) > mesh.userData.bounds.x) {
-            mesh.position.x = mesh.position.x > 0 ? 
-              mesh.userData.bounds.x : -mesh.userData.bounds.x;
+            mesh.position.x = mesh.position.x > 0 ? mesh.userData.bounds.x : -mesh.userData.bounds.x;
             mesh.userData.currentVelocity.x *= -elasticity;
           }
           if (Math.abs(mesh.position.y) > mesh.userData.bounds.y) {
-            mesh.position.y = mesh.position.y > 0 ? 
-              mesh.userData.bounds.y : -mesh.userData.bounds.y;
+            mesh.position.y = mesh.position.y > 0 ? mesh.userData.bounds.y : -mesh.userData.bounds.y;
             mesh.userData.currentVelocity.y *= -elasticity;
           }
-          
-          // Special handling for Z-axis to keep images more visible
+
           if (mesh.position.z < mesh.userData.minZ) {
             mesh.position.z = mesh.userData.minZ;
-            mesh.userData.currentVelocity.z *= -elasticity * 1.2; // Stronger bounce from back wall
+            mesh.userData.currentVelocity.z *= -elasticity * 1.2;
           } else if (mesh.position.z > mesh.userData.bounds.z) {
             mesh.position.z = mesh.userData.bounds.z;
             mesh.userData.currentVelocity.z *= -elasticity;
           }
-          
-          // Improved deceleration with more realistic damping
-          const airResistance = 0.97; // Slightly higher to maintain momentum longer
-          mesh.userData.currentVelocity.x *= airResistance;
-          mesh.userData.currentVelocity.y *= airResistance;
-          mesh.userData.currentVelocity.z *= airResistance;
+
+          // Apply damping with delta time
+          const airRes = 0.97;
+          mesh.userData.currentVelocity.x *= Math.pow(airRes, dt * 60);
+          mesh.userData.currentVelocity.y *= Math.pow(airRes, dt * 60);
+          mesh.userData.currentVelocity.z *= Math.pow(airRes, dt * 60);
           
           // More accurate distance calculation for phase transition
           const distanceToTarget = new THREE.Vector3(
@@ -621,15 +618,12 @@ export default function Home() {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
-      
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('click', handleMouseClick);
-      
       if (rendererRef.current && containerRef.current) {
         containerRef.current.removeChild(rendererRef.current.domElement);
       }
-      
       imagesRef.current.forEach((mesh) => {
         mesh.geometry.dispose();
         if (mesh.material instanceof THREE.Material) {
@@ -639,7 +633,9 @@ export default function Home() {
         }
       });
     };
-  }, [isMouseInteractionEnabled]);
+  // Only run once on mount/unmount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (imagesLoaded === totalImages) {
@@ -826,14 +822,20 @@ export default function Home() {
   // Add new toggle for parallax effects
 
   return (
-    <div className={themeColors.bg}>
-      <main className="relative min-h-screen overflow-hidden">
+    <div className={themeColors.bg} data-theme={currentTheme}>
+      {/* Animated gradient background */}
+      <div className="animated-gradient-bg" aria-hidden="true"></div>
+      {/* Soft vignette overlay */}
+      <div className="vignette-bg" aria-hidden="true"></div>
+      <main className="relative min-h-screen overflow-hidden fadein"
+        style={{ perspective: '800px', perspectiveOrigin: '50% 50%' }}
+      >
         {/* Background canvas for rotating images */}
         <div ref={containerRef} className="absolute inset-0 z-0"></div>
         
         {/* Loading overlay */}
         {isLoading && (
-          <div className={`absolute inset-0 z-20 flex items-center justify-center ${themeColors.overlay}`}>
+          <div className={`absolute inset-0 z-20 flex items-center justify-center glass ${themeColors.overlay}`}>
             <div className="text-center">
               <div className={`${themeColors.text} text-2xl mb-4`}>Loading images: {loadingProgress}%</div>
               <div className={`w-64 h-2 ${themeColors.card} rounded-full overflow-hidden`}>
@@ -875,8 +877,8 @@ export default function Home() {
           </header>
           
           {/* Main hero content */}
-          <div className="flex-1 flex flex-col items-center justify-center px-4 text-center">
-            <h1 className={`text-8xl font-bold mb-4 ${themeColors.text}`}>
+          <div ref={heroRef} className="flex-1 flex flex-col items-center justify-center px-4 text-center">
+            <h1 className={`text-8xl font-bold mb-4 ${themeColors.text}`} style={{textShadow: '0 4px 24px rgba(0,0,0,0.18), 0 1.5px 0 #fff'}}>
               BERNET<sup className="text-xl align-super">©</sup>
             </h1>
             <p className={`text-xl ${themeColors.textMuted}`}>
@@ -898,10 +900,10 @@ export default function Home() {
               </button>
               
               {showThemeSelector && (
-                <div className="fixed inset-0 z-40" onClick={() => setShowThemeSelector(false)}>
+                <div className="fixed inset-0 z-[100]" onClick={() => setShowThemeSelector(false)}>
                   <div 
-                    className={`absolute top-12 left-0 p-3 rounded-xl shadow-2xl ${themeColors.bg} border-2 ${themeColors.border} z-50 min-w-[200px]`} 
-                    style={{boxShadow: '0 10px 25px rgba(0, 0, 0, 0.5)'}}
+                    className={`absolute top-12 left-0 p-3 rounded-xl glass shadow-2xl ${themeColors.bg} border-2 ${themeColors.border} z-[101] min-w-[200px] fadein theme-modal`} 
+                    style={{boxShadow: '0 10px 32px 0 rgba(31,38,135,0.18), 0 2px 12px 0 rgba(0,0,0,0.10)'}}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <div className="grid grid-cols-1 gap-2 w-full">
@@ -940,7 +942,7 @@ export default function Home() {
       </main>
 
       {/* Interactive Image Gallery Section - Updated to support all themes */}
-      <section id="gallery-section" className={`relative z-20 py-24 px-4 bg-gradient-to-b ${themeColors.gradientFrom} ${themeColors.gradientVia} to-transparent`}>
+      <section id="gallery-section" className={`relative z-20 py-24 px-4 bg-gradient-to-b ${themeColors.gradientFrom} ${themeColors.gradientVia} to-transparent fadein`}>
         <div className="max-w-7xl mx-auto">
           <div className="mb-16 text-center">
             <h2 className={`text-5xl font-bold mb-4 ${themeColors.text}`}>
@@ -967,10 +969,11 @@ export default function Home() {
               {imageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
                 <div
                   key={url + idx}
-                  className="break-inside-avoid-column group"
+                  className="break-inside-avoid-column group opacity-0"
+                  ref={el => setPreviewImageRef(el, idx)}
                 >
                   <button
-                    className="relative block w-full overflow-hidden rounded-xl shadow-lg hover:shadow-2xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
+                    className="relative block w-full overflow-hidden rounded-xl beauty-btn focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2"
                     onClick={() => {
                       setModalIndex(idx);
                       setModalOpen(true);
@@ -982,12 +985,12 @@ export default function Home() {
                         src={url}
                         alt={`Gallery image ${idx + 1}`}
                         fill
-                        className="object-cover transition-all duration-500 group-hover:scale-105 will-change-transform"
+                        className="object-cover beauty-img fadein"
                         sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
                         priority={idx < 4}
                       />
                     </div>
-                    <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
+                    <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 glass`}>
                       <div className="absolute bottom-0 left-0 right-0 p-4 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                         <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
                           Photo {idx + 1}
@@ -1009,7 +1012,7 @@ export default function Home() {
                 </h3>
                 <button
                   onClick={toggleAllPhotos}
-                  className={`px-4 py-2 rounded-full ${themeColors.card} ${themeColors.text} hover:bg-opacity-50 transition-colors duration-300`}
+                  className={`px-4 py-2 rounded-full beauty-btn ${themeColors.card} ${themeColors.text} hover:bg-opacity-50 transition-colors duration-300`}
                 >
                   <span className="flex items-center gap-2">
                     <span>Back to Preview</span>
@@ -1024,10 +1027,11 @@ export default function Home() {
                 {allImageUrls.filter(url => url && url.trim() !== '').map((url, idx) => (
                   <div
                     key={url + idx}
-                    className="group"
+                    className="group opacity-0"
+                    ref={el => setFullImageRef(el, idx)}
                   >
                     <button
-                      className="relative block w-full overflow-hidden rounded-lg shadow-md hover:shadow-xl transform transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="relative block w-full overflow-hidden rounded-lg beauty-btn focus:outline-none focus:ring-2 focus:ring-purple-500"
                       onClick={() => {
                         setModalIndex(idx);
                         setModalOpen(true);
@@ -1039,11 +1043,11 @@ export default function Home() {
                           src={url}
                           alt={`Gallery image ${idx + 1}`}
                           fill
-                          className="object-cover transition-all duration-500 group-hover:scale-105"
+                          className="object-cover beauty-img fadein"
                           sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 20vw"
                         />
                       </div>
-                      <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300`}>
+                      <div className={`absolute inset-0 bg-gradient-to-t from-${currentTheme === 'light' ? 'black/30' : 'black/60'} via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 glass`}>
                         <div className="absolute bottom-0 left-0 right-0 p-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                           <span className="inline-block px-2 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs text-white font-medium">
                             #{idx + 1}
@@ -1065,7 +1069,7 @@ export default function Home() {
               </p>
               <button 
                 onClick={toggleAllPhotos}
-                className={`px-6 py-3 rounded-full ${themeColors.button} ${themeColors.buttonHover} font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
+                className={`px-6 py-3 rounded-full beauty-btn ${themeColors.button} ${themeColors.buttonHover} font-medium transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2`}
               >
                 View All Photos
               </button>
@@ -1075,74 +1079,79 @@ export default function Home() {
 
         {/* Enhanced Modal for full image view */}
         {modalOpen && (
-          <div
-            className={`fixed inset-0 z-50 flex items-center justify-center ${themeColors.modalBg} backdrop-blur-sm transition-all`}
-            onClick={handleModalBackdropClick}
-          >
-            <div 
-              className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center" 
-              onClick={e => e.stopPropagation()}
+          <>
+            {/* Soft vignette overlay for modal */}
+            <div className="vignette-bg z-40 pointer-events-none" />
+            <div
+              className={`fixed inset-0 z-50 flex items-center justify-center glass ${themeColors.modalBg} backdrop-blur-sm transition-all theme-modal`}
+              onClick={handleModalBackdropClick}
             >
-              <button
-                className={`absolute -top-12 right-0 ${themeColors.iconColor} hover:opacity-100 opacity-80 text-sm flex items-center gap-2 ${themeColors.card} rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none`}
-                onClick={closeModal}
-                aria-label="Close modal"
+              <div 
+                className="relative max-w-5xl w-full max-h-[90vh] flex flex-col items-center animate-modal-pop shadow-2xl border-2 border-white/20 dark:border-black/30 bg-gradient-to-b from-black/60 to-black/80"
+                onClick={e => e.stopPropagation()}
+                style={{ boxShadow: '0 16px 48px 0 rgba(31,38,135,0.22), 0 4px 24px 0 rgba(0,0,0,0.18)' }}
               >
-                <span>Close</span>
-                <span className="text-lg">×</span>
-              </button>
-              
-              <div className="relative overflow-hidden rounded-xl bg-gradient-to-b from-black/50 to-black p-1">
-                {(() => {
-                  // Use the appropriate image array based on source
-                  const currentImageArray = showAllPhotos ? allImageUrls : imageUrls;
-                  
-                  // Ensure modalIndex is within bounds
-                  const safeModalIndex = Math.min(Math.max(0, modalIndex), currentImageArray.length - 1);
-                  const imageSrc = currentImageArray[safeModalIndex] || '';
-                  
-                  return imageSrc && imageSrc.trim() !== '' ? (
-                    <Image
-                      src={imageSrc}
-                      alt={`Full image ${safeModalIndex + 1}`}
-                      width={1200}
-                      height={900}
-                      className="max-h-[75vh] object-contain rounded-lg"
-                      priority
-                    />
-                  ) : (
-                    <div className="w-[1200px] h-[900px] max-h-[75vh] flex items-center justify-center text-gray-400">
-                      Image not available
-                    </div>
-                  );
-                })()}
-              </div>
-              
-              <div className="flex items-center justify-between w-full mt-4 px-4">
                 <button
-                  className={`${themeColors.iconColor} opacity-80 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-opacity duration-200`}
-                  onClick={showPrevImage}
-                  aria-label="Previous image"
+                  className={`absolute -top-12 right-0 beauty-btn ${themeColors.iconColor} hover:opacity-100 opacity-80 text-sm flex items-center gap-2 ${themeColors.card} rounded-full px-4 py-2 transition-colors duration-200 focus:outline-none`}
+                  onClick={closeModal}
+                  aria-label="Close modal"
                 >
-                  <span className="text-2xl">←</span>
-                  <span className="hidden sm:inline">Previous</span>
+                  <span>Close</span>
+                  <span className="text-lg theme-close-anim">×</span>
                 </button>
                 
-                <div className={`${themeColors.textMuted} text-sm`}>
-                  {modalIndex + 1} / {(showAllPhotos ? allImageUrls : imageUrls).length}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-black/60 to-black/90 p-2 animate-image-fadein">
+                  {(() => {
+                    // Use the appropriate image array based on source
+                    const currentImageArray = showAllPhotos ? allImageUrls : imageUrls;
+                    
+                    // Ensure modalIndex is within bounds
+                    const safeModalIndex = Math.min(Math.max(0, modalIndex), currentImageArray.length - 1);
+                    const imageSrc = currentImageArray[safeModalIndex] || '';
+                    
+                    return imageSrc && imageSrc.trim() !== '' ? (
+                      <Image
+                        src={imageSrc}
+                        alt={`Full image ${safeModalIndex + 1}`}
+                        width={1200}
+                        height={900}
+                        className="max-h-[75vh] object-contain rounded-xl shadow-xl border border-white/10 animate-image-pop"
+                        priority
+                      />
+                    ) : (
+                      <div className="w-[1200px] h-[900px] max-h-[75vh] flex items-center justify-center text-gray-400">
+                        Image not available
+                      </div>
+                    );
+                  })()}
                 </div>
                 
-                <button
-                  className={`${themeColors.iconColor} opacity-80 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-opacity duration-200`}
-                  onClick={showNextImage}
-                  aria-label="Next image"
-                >
-                  <span className="hidden sm:inline">Next</span>
-                  <span className="text-2xl">→</span>
-                </button>
+                <div className="flex items-center justify-between w-full mt-4 px-4">
+                  <button
+                    className={`${themeColors.iconColor} opacity-90 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-all duration-200 text-2xl sm:text-3xl px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 shadow-md border border-white/20 nav-arrow-btn`}
+                    onClick={showPrevImage}
+                    aria-label="Previous image"
+                  >
+                    <span className="theme-arrow-anim">←</span>
+                    <span className="hidden sm:inline text-base font-medium">Previous</span>
+                  </button>
+                  
+                  <div className={`${themeColors.textMuted} text-sm sm:text-base font-medium`}>
+                    {modalIndex + 1} / {(showAllPhotos ? allImageUrls : imageUrls).length}
+                  </div>
+                  
+                  <button
+                    className={`${themeColors.iconColor} opacity-90 hover:opacity-100 flex items-center gap-2 focus:outline-none focus:opacity-100 transition-all duration-200 text-2xl sm:text-3xl px-4 py-2 rounded-full bg-white/10 hover:bg-white/20 shadow-md border border-white/20 nav-arrow-btn`}
+                    onClick={showNextImage}
+                    aria-label="Next image"
+                  >
+                    <span className="hidden sm:inline text-base font-medium">Next</span>
+                    <span className="theme-arrow-anim">→</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </section>
 
