@@ -18,7 +18,7 @@ export default function Home() {
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [isMouseInteractionEnabled] = useState(true);
-  const totalImages = 166;
+  const totalImages = 169;
   const maxImagesFor3D = 50;
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -136,9 +136,9 @@ export default function Home() {
 
     // Load images for 3D view (subset)
     const imageFiles = Array.from({ length: totalImages }, (_, i) => {
-      // Format number with leading zeros (e.g., 003, 004, ..., 168)
-      const num = (i + 3).toString().padStart(3, '0');
-      // Special case for 112.JPG which has uppercase extension
+      // Format number with leading zeros (e.g., 001, 002, ..., 166)
+      const num = (i + 1).toString().padStart(3, '0');
+      // Special case for 110.JPG which has uppercase extension
       return num === '112' ? `/images/${num}.JPG` : `/images/${num}.jpg`;
     });
     

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bernet - Enter my lens</title>
+    <style>
+        /* Base styles */
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #121218;
+            --text-primary: #f0f0f5;
+            --text-secondary: #b0b0c0;
+            --accent: #6d28d9;
+            --accent-light: #7c3aed;
+            --border-radius: 12px;
+            --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(109, 40, 217, 0.1) 0%, transparent 30%),
+                radial-gradient(circle at 90% 80%, rgba(124, 58, 237, 0.1) 0%, transparent 40%);
+        }
+
+        /* Flyer container */
+        .flyer {
+            max-width: 1200px;
+            width: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        /* Image grid */
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 0.5rem;
+            padding: 1.5rem;
+            height: 100%;
+            position: relative;
+        }
+
+        .image-container {
+            overflow: hidden;
+            border-radius: calc(var(--border-radius) / 2);
+            position: relative;
+            transition: transform 0.4s ease;
+        }
+
+        .image-container:hover {
+            transform: scale(1.03);
+            z-index: 2;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.8s ease;
+        }
+
+        .image-container:hover img {
+            transform: scale(1.1);
+        }
+
+        /* Overlay effect */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, rgba(10, 10, 15, 0.7), rgba(10, 10, 15, 0.3));
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Content section */
+        .content {
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            line-height: 1.1;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-light) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.03em;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-weight: 300;
+            letter-spacing: -0.01em;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-icon {
+            background: var(--accent);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        /* CTA button */
+        .cta {
+            display: inline-block;
+            background: var(--accent);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            text-decoration: none;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(109, 40, 217, 0.4);
+            align-self: flex-start;
+        }
+
+        .cta:hover {
+            background: var(--accent-light);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(109, 40, 217, 0.5);
+        }
+
+        /* Footer */
+        .footer {
+            position: absolute;
+            bottom: 1rem;
+            right: 3rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* Glowing effect */
+        .glow {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: var(--accent);
+            filter: blur(80px);
+            opacity: 0.15;
+            z-index: 0;
+        }
+
+        .glow-1 {
+            top: -30px;
+            right: 40%;
+        }
+
+        .glow-2 {
+            bottom: -50px;
+            left: 30%;
+        }
+
+        /* Responsive design */
+        @media (max-width: 940px) {
+            .flyer {
+                grid-template-columns: 1fr;
+            }
+
+            .content {
+                padding: 2rem 1.5rem;
+            }
+
+            h1 {
+                font-size: 3rem;
+            }
+
+            .image-grid {
+                grid-template-columns: repeat(2, 1fr);
+                grid-template-rows: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .features {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2.5rem;
+            }
+
+            .tagline {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="flyer">
+        <!-- Glow effects -->
+        <div class="glow glow-1"></div>
+        <div class="glow glow-2"></div>
+
+        <!-- Image grid section -->
+        <div class="image-grid">
+            <div class="overlay"></div>
+            <div class="image-container" style="grid-column: 1/3; grid-row: 1/3;">
+                <img src="public/images/092.jpg" alt="Bernet Photography">
+            </div>
+            <div class="image-container" style="grid-column: 3/4; grid-row: 1/2;">
+                <img src="public/images/055.jpg" alt="Bernet Photography">
+            </div>
+            <div class="image-container" style="grid-column: 3/4; grid-row: 2/3;">
+                <img src="public/images/052.jpg" alt="Bernet Photography">
+            </div>
+            <div class="image-container" style="grid-column: 1/2; grid-row: 3/4;">
+                <img src="public/images/108.jpg" alt="Bernet Photography">
+            </div>
+            <div class="image-container" style="grid-column: 2/4; grid-row: 3/4;">
+                <img src="public/images/094.jpg" alt="Bernet Photography">
+            </div>
+        </div>
+
+        <!-- Content section -->
+        <div class="content">
+            <h1>BERNET</h1>
+            <div class="tagline">Enter my lens.</div>
+
+            <p>
+                Experience photography in a new dimension. Bernet is an immersive 3D photo gallery that brings your visual journey to life through interactive technology and stunning imagery.
+            </p>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">3D</div>
+                    <div>Interactive 3D Experience</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🖼️</div>
+                    <div>Extensive Photo Collection</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌓</div>
+                    <div>Dark Mode & Themes</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">✨</div>
+                    <div>Dynamic Animations</div>
+                </div>
+            </div>
+
+            <p>
+                Dive into a curated collection of photography with an interface that pushes the boundaries of digital galleries. Explore perspectives, themes, and moments captured through an artistic lens.
+            </p>
+
+            <a href="#" class="cta">Explore Gallery</a>
+
+            <div class="footer">© 2023 Bernet Photography. All rights reserved.</div>
+        </div>
+    </div>
+</body>
+</html> 
