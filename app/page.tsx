@@ -18,7 +18,8 @@ export default function Home() {
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   const [imagesLoaded, setImagesLoaded] = useState(0);
   const [isMouseInteractionEnabled] = useState(true);
-  const totalImages = 35;
+  const totalImages = 166;
+  const maxImagesFor3D = 50;
   const [hoveredImage, setHoveredImage] = useState<THREE.Mesh | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -134,161 +135,176 @@ export default function Home() {
     scene.add(spotlight);
 
     // Load images for 3D view (subset)
-    const imageFiles = Array.from({ length: 35 }, (_, i) => 
-      `/images/DSCF${3726 + i}.JPG`
-    );
+    const imageFiles = Array.from({ length: totalImages }, (_, i) => {
+      // Format number with leading zeros (e.g., 003, 004, ..., 168)
+      const num = (i + 3).toString().padStart(3, '0');
+      // Special case for 112.JPG which has uppercase extension
+      return num === '112' ? `/images/${num}.JPG` : `/images/${num}.jpg`;
+    });
     
-    setImageUrls(imageFiles.slice(0, 12)); // Show only first 12 images in preview
+    // Use all images for gallery but limit 3D scene for performance
+    setImageUrls(imageFiles.slice(0, 24)); // Show 24 images in preview (increased from 12)
+    setAllImageUrls(imageFiles);
     
-    // Load all images for the full gallery view
-    const allFiles = Array.from({ length: 35 }, (_, i) => 
-      `/images/DSCF${3726 + i}.JPG`
-    );
-    setAllImageUrls(allFiles);
-
     const textureLoader = new THREE.TextureLoader();
     textureLoader.crossOrigin = "anonymous";
     
     const imagesArray: THREE.Mesh[] = [];
 
-    // Remove the duplication of images by removing the spread
-    imageFiles.forEach((src, index) => {
-      textureLoader.load(src, (texture) => {
-        // Improved texture quality
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        
-        // Color correction for the texture - modern Three.js approach
-        texture.colorSpace = THREE.SRGBColorSpace;
-        
-        const aspectRatio = texture.image.width / texture.image.height;
-        const width = 1.5;
-        const height = width / aspectRatio;
+    // Only load a subset of images for the 3D scene to maintain performance
+    // Select evenly distributed images from the full set
+    const imagesFor3D = totalImages <= maxImagesFor3D 
+      ? imageFiles 
+      : Array.from({ length: maxImagesFor3D }, (_, i) => 
+          imageFiles[Math.floor(i * (totalImages / maxImagesFor3D))]);
+    
+    imagesFor3D.forEach((src, index) => {
+      textureLoader.load(
+        src, 
+        (texture) => {
+          // Improved texture quality
+          texture.minFilter = THREE.LinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          
+          // Color correction for the texture - modern Three.js approach
+          texture.colorSpace = THREE.SRGBColorSpace;
+          
+          const aspectRatio = texture.image.width / texture.image.height;
+          const width = 1.5;
+          const height = width / aspectRatio;
 
-        const geometry = new THREE.PlaneGeometry(width, height);
-        
-        // Add some variation in materials
-        const materialType = Math.random() > 0.7 ? 'glossy' : 'standard';
-        let material;
-        
-        if (materialType === 'glossy') {
-          material = new THREE.MeshStandardMaterial({
-            map: texture,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.95,
-            alphaTest: 0.1,
-            roughness: 0.05, // More glossy
-            metalness: 0.3,  // More reflective
-            emissive: new THREE.Color(0x111111),
-            emissiveIntensity: 0.3,
-          });
-        } else {
-          material = new THREE.MeshStandardMaterial({
-            map: texture,
-            side: THREE.DoubleSide,
-            transparent: true,
-            opacity: 0.95,
-            alphaTest: 0.1,
-            roughness: 0.15,
-            metalness: 0.12,
-            emissive: new THREE.Color(0x080808),
-            emissiveIntensity: 0.2,
-          });
+          const geometry = new THREE.PlaneGeometry(width, height);
+          
+          // Add some variation in materials
+          const materialType = Math.random() > 0.7 ? 'glossy' : 'standard';
+          let material;
+          
+          if (materialType === 'glossy') {
+            material = new THREE.MeshStandardMaterial({
+              map: texture,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.95,
+              alphaTest: 0.1,
+              roughness: 0.05, // More glossy
+              metalness: 0.3,  // More reflective
+              emissive: new THREE.Color(0x111111),
+              emissiveIntensity: 0.3,
+            });
+          } else {
+            material = new THREE.MeshStandardMaterial({
+              map: texture,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: 0.95,
+              alphaTest: 0.1,
+              roughness: 0.15,
+              metalness: 0.12,
+              emissive: new THREE.Color(0x080808),
+              emissiveIntensity: 0.2,
+            });
+          }
+          
+          const mesh = new THREE.Mesh(geometry, material);
+          
+          // Initial position - all images start at the center
+          mesh.position.set(0, 0, 0);
+          
+          // Random rotation
+          mesh.rotation.x = Math.random() * Math.PI;
+          mesh.rotation.y = Math.random() * Math.PI;
+          
+          // Increased scale for more presence
+          const scale = 0.4 + Math.random() * 0.4;
+          mesh.scale.set(scale, scale, scale);
+          
+          // Store the original scale for hover effects
+          mesh.userData.originalScale = { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z };
+          
+          // Store image index for modal opening
+          mesh.userData.imageIndex = index;
+          
+          // ---- IMPROVED PHYSICS - TARGET POSITIONING ----
+          // Define boundaries with improved Z constraints
+          const boundX = 8; // Reduced boundary to keep images more centered
+          const boundY = 3;
+          const boundZ = 4; // Increased depth for a more layered effect
+          const minZ = -2; // Allow some images to go slightly further back
+          
+          // Define clustering factor - some images will cluster together
+          const useCluster = Math.random() > 0.6;
+          const clusterCenterX = (Math.random() - 0.5) * boundX;
+          const clusterCenterY = (Math.random() - 0.5) * boundY;
+          const clusterCenterZ = (Math.random() * boundZ * 0.7) + (minZ * 0.3);
+          
+          // Generate random positions with optional clustering
+          let targetX, targetY, targetZ;
+          
+          if (useCluster) {
+            // Cluster around a center point with small offsets
+            targetX = clusterCenterX + (Math.random() - 0.5) * 2;
+            targetY = clusterCenterY + (Math.random() - 0.5) * 2;
+            targetZ = clusterCenterZ + (Math.random() - 0.5) * 1.5;
+          } else {
+            // Normal distribution across space
+            targetX = (Math.random() - 0.5) * boundX * 2;
+            targetY = (Math.random() - 0.5) * boundY * 2;
+            targetZ = (Math.random() * boundZ * 1.5) - minZ;
+          }
+          
+          // Apply constraints
+          const constrainedTargetX = Math.max(-boundX, Math.min(boundX, targetX));
+          const constrainedTargetY = Math.max(-boundY, Math.min(boundY, targetY));
+          const constrainedTargetZ = Math.max(minZ, Math.min(boundZ, targetZ));
+          
+          // Initial velocity with improved physics parameters
+          const velocityFactor = 0.08; // Increased for more dynamic movement
+          const initialVelocity = {
+            x: constrainedTargetX * velocityFactor,
+            y: constrainedTargetY * velocityFactor,
+            z: constrainedTargetZ * velocityFactor,
+          };
+          
+          // Create custom properties for animation with improved physics
+          mesh.userData = {
+            targetPosition: { x: constrainedTargetX, y: constrainedTargetY, z: constrainedTargetZ },
+            initialVelocity: initialVelocity,
+            currentVelocity: { ...initialVelocity },
+            rotationSpeed: {
+              x: (Math.random() - 0.5) * 0.008, // Increased rotation speeds
+              y: (Math.random() - 0.5) * 0.008,
+              z: (Math.random() - 0.5) * 0.005,
+            },
+            movementSpeed: {
+              x: (Math.random() - 0.5) * 0.002, // Slightly increased drift
+              y: (Math.random() - 0.5) * 0.002,
+              z: (Math.random() - 0.5) * 0.001,
+            },
+            animationPhase: 'waiting', // Start as 'waiting' instead of 'burst'
+            bounds: { x: boundX, y: boundY, z: boundZ },
+            minZ: minZ, // Store minimum Z value
+            floatingEffect: {
+              enabled: Math.random() > 0.3, // Most images have floating effect
+              amplitude: 0.05 + Math.random() * 0.1,
+              frequency: 0.2 + Math.random() * 0.3,
+              phase: Math.random() * Math.PI * 2, // Random starting phase
+            },
+            imageIndex: index, // Ensure imageIndex is in userData
+          };
+          
+          scene.add(mesh);
+          imagesArray.push(mesh);
+          
+          setImagesLoaded(prev => prev + 1);
+        },
+        undefined, // onProgress callback not needed
+        (error) => {
+          // Error handling for failed image loads
+          console.warn(`Failed to load image: ${src}`, error);
+          setImagesLoaded(prev => prev + 1); // Still increment counter so we don't block progress
         }
-        
-        const mesh = new THREE.Mesh(geometry, material);
-        
-        // Initial position - all images start at the center
-        mesh.position.set(0, 0, 0);
-        
-        // Random rotation
-        mesh.rotation.x = Math.random() * Math.PI;
-        mesh.rotation.y = Math.random() * Math.PI;
-        
-        // Increased scale for more presence
-        const scale = 0.4 + Math.random() * 0.4;
-        mesh.scale.set(scale, scale, scale);
-        
-        // Store the original scale for hover effects
-        mesh.userData.originalScale = { x: mesh.scale.x, y: mesh.scale.y, z: mesh.scale.z };
-        
-        // Store image index for modal opening
-        mesh.userData.imageIndex = index;
-        
-        // ---- IMPROVED PHYSICS - TARGET POSITIONING ----
-        // Define boundaries with improved Z constraints
-        const boundX = 8; // Reduced boundary to keep images more centered
-        const boundY = 3;
-        const boundZ = 4; // Increased depth for a more layered effect
-        const minZ = -2; // Allow some images to go slightly further back
-        
-        // Define clustering factor - some images will cluster together
-        const useCluster = Math.random() > 0.6;
-        const clusterCenterX = (Math.random() - 0.5) * boundX;
-        const clusterCenterY = (Math.random() - 0.5) * boundY;
-        const clusterCenterZ = (Math.random() * boundZ * 0.7) + (minZ * 0.3);
-        
-        // Generate random positions with optional clustering
-        let targetX, targetY, targetZ;
-        
-        if (useCluster) {
-          // Cluster around a center point with small offsets
-          targetX = clusterCenterX + (Math.random() - 0.5) * 2;
-          targetY = clusterCenterY + (Math.random() - 0.5) * 2;
-          targetZ = clusterCenterZ + (Math.random() - 0.5) * 1.5;
-        } else {
-          // Normal distribution across space
-          targetX = (Math.random() - 0.5) * boundX * 2;
-          targetY = (Math.random() - 0.5) * boundY * 2;
-          targetZ = (Math.random() * boundZ * 1.5) - minZ;
-        }
-        
-        // Apply constraints
-        const constrainedTargetX = Math.max(-boundX, Math.min(boundX, targetX));
-        const constrainedTargetY = Math.max(-boundY, Math.min(boundY, targetY));
-        const constrainedTargetZ = Math.max(minZ, Math.min(boundZ, targetZ));
-        
-        // Initial velocity with improved physics parameters
-        const velocityFactor = 0.08; // Increased for more dynamic movement
-        const initialVelocity = {
-          x: constrainedTargetX * velocityFactor,
-          y: constrainedTargetY * velocityFactor,
-          z: constrainedTargetZ * velocityFactor,
-        };
-        
-        // Create custom properties for animation with improved physics
-        mesh.userData = {
-          targetPosition: { x: constrainedTargetX, y: constrainedTargetY, z: constrainedTargetZ },
-          initialVelocity: initialVelocity,
-          currentVelocity: { ...initialVelocity },
-          rotationSpeed: {
-            x: (Math.random() - 0.5) * 0.008, // Increased rotation speeds
-            y: (Math.random() - 0.5) * 0.008,
-            z: (Math.random() - 0.5) * 0.005,
-          },
-          movementSpeed: {
-            x: (Math.random() - 0.5) * 0.002, // Slightly increased drift
-            y: (Math.random() - 0.5) * 0.002,
-            z: (Math.random() - 0.5) * 0.001,
-          },
-          animationPhase: 'waiting', // Start as 'waiting' instead of 'burst'
-          bounds: { x: boundX, y: boundY, z: boundZ },
-          minZ: minZ, // Store minimum Z value
-          floatingEffect: {
-            enabled: Math.random() > 0.3, // Most images have floating effect
-            amplitude: 0.05 + Math.random() * 0.1,
-            frequency: 0.2 + Math.random() * 0.3,
-            phase: Math.random() * Math.PI * 2, // Random starting phase
-          },
-        };
-        
-        scene.add(mesh);
-        imagesArray.push(mesh);
-        
-        setImagesLoaded(prev => prev + 1);
-      });
+      );
     });
     
     imagesRef.current = imagesArray;
@@ -650,11 +666,14 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Calculate actual number of 3D images being loaded for burst animation and loading indicator
+  const actual3DImagesCount = Math.min(totalImages, maxImagesFor3D);
+
   useEffect(() => {
-    if (imagesLoaded === totalImages) {
+    if (imagesLoaded === actual3DImagesCount) {
       setStartBurst(true);
     }
-  }, [imagesLoaded, totalImages]);
+  }, [imagesLoaded, actual3DImagesCount]);
 
   imagesRef.current.forEach((mesh) => {
     // Start burst for all images when startBurst is true
@@ -679,8 +698,8 @@ export default function Home() {
 
 
   // Loading indicator calculation
-  const loadingProgress = Math.round((imagesLoaded / totalImages) * 100);
-  const isLoading = imagesLoaded < totalImages;
+  const loadingProgress = Math.round((imagesLoaded / actual3DImagesCount) * 100);
+  const isLoading = imagesLoaded < actual3DImagesCount;
 
   const closeModal = () => setModalOpen(false);
 
