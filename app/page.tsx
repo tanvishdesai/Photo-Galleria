@@ -656,15 +656,12 @@ export default function Home() {
     }
   }, [imagesLoaded, totalImages]);
 
-  // Trigger burst animation once when startBurst becomes true
-  useEffect(() => {
-    if (!startBurst) return;
-    imagesRef.current.forEach((mesh) => {
-      if (mesh.userData.animationPhase === 'waiting') {
-        mesh.userData.animationPhase = 'burst';
-      }
-    });
-  }, [startBurst]);
+  imagesRef.current.forEach((mesh) => {
+    // Start burst for all images when startBurst is true
+    if (mesh.userData.animationPhase === 'waiting' && startBurst) {
+      mesh.userData.animationPhase = 'burst';
+    }
+  });
 
   // Add click outside handler for theme selector
   useEffect(() => {
